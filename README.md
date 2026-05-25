@@ -27,7 +27,7 @@ This repo includes a `render.yaml` Blueprint for a Node web service. On Render:
 2. Render will use `npm install` and `npm start`.
 3. Add secret values for `X_BEARER_TOKEN`, `TRUTH_SOCIAL_PROVIDER_URL`, and `TRUTH_SOCIAL_PROVIDER_TOKEN` if you have them.
 
-The Blueprint mounts a small persistent disk at `data/` so the local JSON event store survives restarts.
+The free Blueprint uses the app's local JSON store for the first skeleton deployment. For production, add a paid persistent disk or move storage to SQLite/Postgres so history survives restarts.
 
 ## Truth Social latency path
 

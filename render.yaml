@@ -16,7 +16,3 @@ services:
         sync: false
       - key: TRUTH_SOCIAL_PROVIDER_TOKEN
         sync: false
-    disk:
-      name: news-aggregator-data
-      mountPath: /opt/render/project/src/data
-      sizeGB: 1
