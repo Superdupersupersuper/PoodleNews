@@ -3,53 +3,57 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>News Aggregator</title>
+    <title>PoodleNews</title>
     <link rel="stylesheet" href="/styles">
   </head>
   <body>
-    <aside class="rail">
+    <header class="deckbar">
       <div class="brand">
         <div class="mark">NA</div>
         <div>
-          <h1>News Aggregator</h1>
+          <h1>PoodleNews</h1>
           <p id="clock">--:--:--</p>
         </div>
       </div>
-      <div class="controls">
+      <div class="deck-controls">
         <label>
           <span>Search</span>
           <input id="search" type="search" placeholder="Ticker, person, keyword">
         </label>
-        <label>
-          <span>Source</span>
-          <select id="sourceFilter">
-            <option value="">All sources</option>
-          </select>
-        </label>
-        <div class="toggles">
-          <button class="is-active" data-filter="all">All</button>
-          <button data-filter="critical">Critical</button>
-          <button data-filter="headline">Headlines</button>
-        </div>
       </div>
-      <section>
-        <h2>Source Health</h2>
-        <div id="sources" class="sources"></div>
-      </section>
-    </aside>
+      <div class="stats">
+        <span id="itemCount">0 items</span>
+        <span id="lastUpdate">Waiting</span>
+      </div>
+    </header>
 
-    <main>
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">Live feed</p>
-          <h2>Market-moving headlines</h2>
+    <main class="deck">
+      <section class="column social-column">
+        <header class="column-head">
+          <div>
+            <p class="eyebrow">Critical lane</p>
+            <h2>Trump Social Media</h2>
+          </div>
+          <span id="socialCount" class="counter">0</span>
+        </header>
+        <div id="socialHealth" class="health-strip"></div>
+        <section id="socialFeed" class="feed"></section>
+      </section>
+
+      <section class="column headlines-column">
+        <header class="column-head">
+          <div>
+            <p class="eyebrow">Keyword wire</p>
+            <h2>Headlines</h2>
+          </div>
+          <span id="headlineCount" class="counter">0</span>
+        </header>
+        <div class="keyword-panel">
+          <span>Watchlist</span>
+          <div id="keywords" class="keywords"></div>
         </div>
-        <div class="stats">
-          <span id="itemCount">0 items</span>
-          <span id="lastUpdate">Waiting</span>
-        </div>
-      </header>
-      <section id="feed" class="feed"></section>
+        <section id="headlineFeed" class="feed empty-feed"></section>
+      </section>
     </main>
 
     <template id="itemTemplate">

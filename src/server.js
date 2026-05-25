@@ -12,6 +12,7 @@ const port = Number(process.env.PORT ?? 4173);
 const host = process.env.HOST ?? "127.0.0.1";
 
 const sources = JSON.parse(await readFile(path.join(root, "config", "sources.json"), "utf8"));
+const watchlist = JSON.parse(await readFile(path.join(root, "config", "watchlist.json"), "utf8"));
 const store = new NewsStore();
 await store.load();
 
@@ -72,6 +73,11 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === "/api/sources") {
     sendJson(res, { sources: ingestor.getStatus() });
+    return;
+  }
+
+  if (url.pathname === "/api/watchlist") {
+    sendJson(res, watchlist);
     return;
   }
 

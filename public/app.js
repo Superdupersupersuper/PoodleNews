@@ -1,15 +1,20 @@
-const feed = document.querySelector("#feed");
-const sourcesEl = document.querySelector("#sources");
+const socialFeed = document.querySelector("#socialFeed");
+const headlineFeed = document.querySelector("#headlineFeed");
+const socialHealth = document.querySelector("#socialHealth");
+const keywordsEl = document.querySelector("#keywords");
 const itemTemplate = document.querySelector("#itemTemplate");
 const search = document.querySelector("#search");
-const sourceFilter = document.querySelector("#sourceFilter");
 const itemCount = document.querySelector("#itemCount");
 const lastUpdate = document.querySelector("#lastUpdate");
+const socialCount = document.querySelector("#socialCount");
+const headlineCount = document.querySelector("#headlineCount");
 const clock = document.querySelector("#clock");
 
-let activeKind = "all";
-let knownSources = new Map();
 let items = [];
+let sources = [];
+let headlineKeywords = [];
+
+const socialSourceIds = new Set(["trump-truth-provider", "trump-x"]);
 
 function timeAgo(value) {
   const then = new Date(value).getTime();
@@ -30,16 +35,17 @@ function setClock() {
   }).format(new Date());
 }
 
-function renderSources(rows) {
-  sourcesEl.replaceChildren();
-  sourceFilter.replaceChildren(new Option("All sources", ""));
+function sanitizeText(value = "") {
+  const el = document.createElement("textarea");
+  el.innerHTML = value;
+  return el.value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
 
-  for (const row of rows) {
-    knownSources.set(row.source.id, row.source);
-    sourceFilter.append(new Option(row.source.label, row.source.id));
-
+function renderHealth(rows) {
+  socialHealth.replaceChildren();
+  for (const row of rows.filter((entry) => socialSourceIds.has(entry.source.id))) {
     const el = document.createElement("div");
-    el.className = "source-row";
+    el.className = "health-card";
     const dotClass = row.ok === true ? "ok" : row.ok === false ? "bad" : "";
     el.innerHTML = `
       <div class="source-head">
@@ -53,22 +59,42 @@ function renderSources(rows) {
       </div>
       ${row.error ? `<div class="item-meta">${row.error}</div>` : ""}
     `;
-    sourcesEl.append(el);
+    socialHealth.append(el);
   }
 }
 
-function renderItems() {
-  const query = search.value.trim().toLowerCase();
-  const selectedSource = sourceFilter.value;
-  const visible = items.filter((item) => {
-    if (selectedSource && item.sourceId !== selectedSource) return false;
-    if (activeKind === "critical" && !item.tags.includes("critical")) return false;
-    if (activeKind === "headline" && item.type !== "headline") return false;
-    if (!query) return true;
-    return `${item.title} ${item.summary} ${item.sourceLabel}`.toLowerCase().includes(query);
-  });
+function keywordMatch(item) {
+  if (headlineKeywords.length === 0) return false;
+  const haystack = `${item.title} ${item.summary || ""}`.toLowerCase();
+  return headlineKeywords.some((keyword) => haystack.includes(keyword.toLowerCase()));
+}
 
-  feed.replaceChildren();
+function renderKeywords() {
+  keywordsEl.replaceChildren();
+  for (const keyword of headlineKeywords) {
+    const chip = document.createElement("span");
+    chip.className = "keyword";
+    chip.textContent = keyword;
+    keywordsEl.append(chip);
+  }
+}
+
+function itemMatchesSearch(item, query) {
+  if (!query) return true;
+  return `${item.title} ${item.summary || ""} ${item.sourceLabel}`.toLowerCase().includes(query);
+}
+
+function renderFeed(target, visible, emptyText) {
+  target.replaceChildren();
+  target.classList.toggle("empty-feed", visible.length === 0);
+  if (visible.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = emptyText;
+    target.append(empty);
+    return;
+  }
+
   for (const item of visible) {
     const node = itemTemplate.content.cloneNode(true);
     const article = node.querySelector(".item");
@@ -76,11 +102,12 @@ function renderItems() {
     node.querySelector(".source").textContent = item.sourceLabel;
     node.querySelector(".age").textContent = timeAgo(item.publishedAt || item.createdAt);
     const title = node.querySelector(".title");
-    title.textContent = item.title;
+    title.textContent = sanitizeText(item.title);
     title.href = item.url || "#";
     const summary = node.querySelector(".summary");
-    summary.textContent = item.summary || "";
-    summary.hidden = !item.summary || item.summary === item.title;
+    const summaryText = sanitizeText(item.summary || "");
+    summary.textContent = summaryText;
+    summary.hidden = !summaryText || summaryText === sanitizeText(item.title);
     const tags = node.querySelector(".tags");
     for (const tag of item.tags ?? []) {
       const pill = document.createElement("span");
@@ -88,35 +115,46 @@ function renderItems() {
       pill.textContent = tag;
       tags.append(pill);
     }
-    feed.append(node);
+    target.append(node);
   }
+}
 
-  itemCount.textContent = `${visible.length} items`;
+function renderItems() {
+  const query = search.value.trim().toLowerCase();
+
+  const socialItems = items
+    .filter((item) => socialSourceIds.has(item.sourceId))
+    .filter((item) => itemMatchesSearch(item, query));
+
+  const headlineItems = items
+    .filter((item) => item.type === "headline")
+    .filter(keywordMatch)
+    .filter((item) => itemMatchesSearch(item, query));
+
+  renderFeed(socialFeed, socialItems, "Waiting for Trump Truth Social / X posts.");
+  renderFeed(headlineFeed, headlineItems, "No watched headlines yet.");
+
+  socialCount.textContent = socialItems.length;
+  headlineCount.textContent = headlineItems.length;
+  itemCount.textContent = `${socialItems.length + headlineItems.length} shown`;
 }
 
 async function refresh() {
-  const [itemsResponse, sourcesResponse] = await Promise.all([
+  const [itemsResponse, sourcesResponse, watchlistResponse] = await Promise.all([
     fetch("/api/items?limit=250"),
-    fetch("/api/sources")
+    fetch("/api/sources"),
+    fetch("/api/watchlist")
   ]);
   items = (await itemsResponse.json()).items;
-  const sourceRows = (await sourcesResponse.json()).sources;
-  renderSources(sourceRows);
+  sources = (await sourcesResponse.json()).sources;
+  headlineKeywords = (await watchlistResponse.json()).headlineKeywords ?? [];
+  renderHealth(sources);
+  renderKeywords();
   renderItems();
   lastUpdate.textContent = `Updated ${timeAgo(new Date().toISOString())}`;
 }
 
-document.querySelectorAll("[data-filter]").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll("[data-filter]").forEach((el) => el.classList.remove("is-active"));
-    button.classList.add("is-active");
-    activeKind = button.dataset.filter;
-    renderItems();
-  });
-});
-
 search.addEventListener("input", renderItems);
-sourceFilter.addEventListener("change", renderItems);
 
 setClock();
 setInterval(setClock, 1000);

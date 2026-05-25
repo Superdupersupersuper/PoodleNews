@@ -7,9 +7,8 @@ const entityMap = {
 };
 
 function decodeEntities(value = "") {
-  return value
+  const decoded = value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<[^>]+>/g, "")
     .replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (_, entity) => {
       if (entity[0] === "#") {
         const code = entity[1]?.toLowerCase() === "x"
@@ -18,7 +17,11 @@ function decodeEntities(value = "") {
         return Number.isFinite(code) ? String.fromCodePoint(code) : "";
       }
       return entityMap[entity.toLowerCase()] ?? `&${entity};`;
-    })
+    });
+
+  return decoded
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
