@@ -16,6 +16,7 @@ export class Ingestor {
     this.sources = sources;
     this.cache = {};
     this.status = new Map();
+    this.stats = new Map();
     this.timers = new Map();
     this.inFlight = new Set();
     this.onFresh = onFresh;
@@ -53,26 +54,75 @@ export class Ingestor {
 
     const startedAt = Date.now();
     this.inFlight.add(source.id);
+    const previous = this.stats.get(source.id) ?? {
+      totalPolls: 0,
+      successfulPolls: 0,
+      failedPolls: 0,
+      consecutiveFailures: 0,
+      receivedTotal: 0,
+      freshTotal: 0,
+      latencyTotalMs: 0,
+      maxLatencyMs: 0
+    };
     try {
       const items = await handler(source, this.cache);
       const fresh = this.store.addMany(items);
       if (fresh.length > 0) await this.store.persist();
       if (fresh.length > 0) this.onFresh?.(fresh, source);
+      const latencyMs = Date.now() - startedAt;
+      const nextStats = {
+        ...previous,
+        totalPolls: previous.totalPolls + 1,
+        successfulPolls: previous.successfulPolls + 1,
+        consecutiveFailures: 0,
+        receivedTotal: previous.receivedTotal + items.length,
+        freshTotal: previous.freshTotal + fresh.length,
+        latencyTotalMs: previous.latencyTotalMs + latencyMs,
+        maxLatencyMs: Math.max(previous.maxLatencyMs, latencyMs),
+        lastSuccessAt: new Date().toISOString(),
+        lastErrorAt: previous.lastErrorAt,
+        lastError: previous.lastError
+      };
+      this.stats.set(source.id, nextStats);
       this.status.set(source.id, {
         ok: true,
         source,
         lastPollAt: new Date().toISOString(),
-        latencyMs: Date.now() - startedAt,
+        nextPollInMs: source.pollMs ?? 30000,
+        pollMs: source.pollMs ?? 30000,
+        latencyMs,
         received: items.length,
-        fresh: fresh.length
+        fresh: fresh.length,
+        stats: {
+          ...nextStats,
+          avgLatencyMs: Math.round(nextStats.latencyTotalMs / Math.max(1, nextStats.successfulPolls))
+        }
       });
     } catch (error) {
+      const latencyMs = Date.now() - startedAt;
+      const nextStats = {
+        ...previous,
+        totalPolls: previous.totalPolls + 1,
+        failedPolls: previous.failedPolls + 1,
+        consecutiveFailures: previous.consecutiveFailures + 1,
+        latencyTotalMs: previous.latencyTotalMs + latencyMs,
+        maxLatencyMs: Math.max(previous.maxLatencyMs, latencyMs),
+        lastErrorAt: new Date().toISOString(),
+        lastError: error.message
+      };
+      this.stats.set(source.id, nextStats);
       this.status.set(source.id, {
         ok: false,
         source,
         lastPollAt: new Date().toISOString(),
-        latencyMs: Date.now() - startedAt,
-        error: error.message
+        nextPollInMs: source.pollMs ?? 30000,
+        pollMs: source.pollMs ?? 30000,
+        latencyMs,
+        error: error.message,
+        stats: {
+          ...nextStats,
+          avgLatencyMs: Math.round(nextStats.latencyTotalMs / Math.max(1, nextStats.totalPolls))
+        }
       });
     } finally {
       this.inFlight.delete(source.id);
@@ -85,9 +135,12 @@ export class Ingestor {
         ok: null,
         source,
         lastPollAt: null,
+        nextPollInMs: source.pollMs ?? 30000,
+        pollMs: source.pollMs ?? 30000,
         latencyMs: null,
         received: 0,
-        fresh: 0
+        fresh: 0,
+        stats: this.stats.get(source.id) ?? null
       };
     });
   }

@@ -14,6 +14,8 @@ const socialCount = document.querySelector("#socialCount");
 const headlineCount = document.querySelector("#headlineCount");
 const whiteHouseCount = document.querySelector("#whiteHouseCount");
 const clock = document.querySelector("#clock");
+const truthHealthDialog = document.querySelector("#truthHealthDialog");
+const truthHealthBody = document.querySelector("#truthHealthBody");
 
 let items = [];
 let sources = [];
@@ -52,11 +54,37 @@ function sanitizeText(value = "") {
   return el.value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function formatMs(value) {
+  if (value == null || Number.isNaN(Number(value))) return "-";
+  const ms = Math.round(Number(value));
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(ms < 10000 ? 1 : 0)}s`;
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat().format(value ?? 0);
+}
+
+function metric(label, value, hint = "") {
+  return `
+    <div class="metric">
+      <span>${label}</span>
+      <strong>${value}</strong>
+      ${hint ? `<small>${hint}</small>` : ""}
+    </div>
+  `;
+}
+
 function renderHealth(rows) {
   socialHealth.replaceChildren();
   for (const row of rows.filter((entry) => socialSourceIds.has(entry.source.id))) {
-    const el = document.createElement("div");
+    const el = document.createElement(row.source.id === "trump-truth-direct" ? "button" : "div");
     el.className = "health-card";
+    if (row.source.id === "trump-truth-direct") {
+      el.type = "button";
+      el.dataset.healthSource = row.source.id;
+      el.title = "Open Truth Social health dashboard";
+    }
     const dotClass = row.ok === true ? "ok" : row.ok === false ? "bad" : "";
     el.innerHTML = `
       <div class="source-head">
@@ -72,6 +100,85 @@ function renderHealth(rows) {
     `;
     socialHealth.append(el);
   }
+}
+
+function statusText(ok) {
+  if (ok === true) return "Online";
+  if (ok === false) return "Fault";
+  return "Pending";
+}
+
+async function openTruthHealth() {
+  truthHealthDialog.showModal();
+  truthHealthBody.innerHTML = `<div class="empty">Loading Truth Social health.</div>`;
+  const response = await fetch("/api/truth-health");
+  const health = await response.json();
+  const direct = health.source;
+  const webhook = health.webhook ?? {};
+  const watcher = webhook.lastWatcher ?? {};
+  const directStats = direct?.stats ?? {};
+  const watcherAge = webhook.lastSeenAt ? timeAgo(webhook.lastSeenAt) : "never";
+  const directAge = direct?.lastPollAt ? timeAgo(direct.lastPollAt) : "pending";
+  const expected = health.expectedPushMs ?? {};
+  const hasWatcher = Boolean(webhook.lastSeenAt);
+  const directDot = direct?.ok === true ? "ok" : direct?.ok === false ? "bad" : "";
+  const watcherDot = watcher.ok === true ? "ok" : watcher.ok === false ? "bad" : hasWatcher ? "ok" : "bad";
+
+  truthHealthBody.innerHTML = `
+    <section class="dashboard-section">
+      <div class="section-title">
+        <span class="dot ${watcherDot}"></span>
+        <div>
+          <h3>Dedicated Watcher</h3>
+          <p>${hasWatcher ? `Last heartbeat ${watcherAge}` : "No watcher heartbeat yet"}</p>
+        </div>
+      </div>
+      <div class="metric-grid">
+        ${metric("Configured poll", formatMs(watcher.pollMs ?? direct?.source?.pollMs ?? 500), "Truth check cadence")}
+        ${metric("Truth response", formatMs(watcher.truthLatencyMs), "Last fetch duration")}
+        ${metric("Webhook push", formatMs(watcher.webhookLatencyMs), "Watcher to PoodleNews")}
+        ${metric("Errors", formatNumber(watcher.consecutiveErrors), "Consecutive watcher failures")}
+      </div>
+      <div class="wire-line">
+        <span>Expected post-to-screen</span>
+        <strong>${formatMs(expected.optimistic)} - ${formatMs(expected.worstTypical)}</strong>
+      </div>
+      ${watcher.error ? `<div class="alert-line">${sanitizeText(watcher.error)}</div>` : ""}
+    </section>
+
+    <section class="dashboard-section">
+      <div class="section-title">
+        <span class="dot ${directDot}"></span>
+        <div>
+          <h3>Render Direct Poller</h3>
+          <p>${statusText(direct?.ok)} · last poll ${directAge}</p>
+        </div>
+      </div>
+      <div class="metric-grid">
+        ${metric("Poll interval", formatMs(direct?.pollMs ?? direct?.source?.pollMs), "Render fallback")}
+        ${metric("Last latency", formatMs(direct?.latencyMs), "Request duration")}
+        ${metric("Total polls", formatNumber(directStats.totalPolls), `${formatNumber(directStats.failedPolls)} failed`)}
+        ${metric("Fresh posts", formatNumber(directStats.freshTotal), "Accepted by feed")}
+      </div>
+      ${direct?.error ? `<div class="alert-line">${sanitizeText(direct.error)}</div>` : ""}
+    </section>
+
+    <section class="dashboard-section">
+      <div class="section-title">
+        <span class="dot ${webhook.configured ? "ok" : "bad"}"></span>
+        <div>
+          <h3>Webhook Intake</h3>
+          <p>${webhook.configured ? "Secret configured" : "Secret missing"} · ${formatNumber(webhook.totalPayloads)} payloads</p>
+        </div>
+      </div>
+      <div class="metric-grid">
+        ${metric("Statuses seen", formatNumber(webhook.totalStatuses), `${formatNumber(webhook.totalFresh)} fresh`)}
+        ${metric("Media seen", formatNumber(webhook.totalMedia), "Truth attachments")}
+        ${metric("Last payload", webhook.lastPayloadAt ? timeAgo(webhook.lastPayloadAt) : "none", "Had posts")}
+        ${metric("Last fresh", webhook.lastFreshAt ? timeAgo(webhook.lastFreshAt) : "none", "New item accepted")}
+      </div>
+    </section>
+  `;
 }
 
 function renderWhiteHouseAccounts(rows) {
@@ -254,6 +361,12 @@ whiteHouseAccounts.addEventListener("click", async (event) => {
   if (!button) return;
   await fetch(`/api/white-house-x/${encodeURIComponent(button.dataset.handle)}`, { method: "DELETE" });
   await refresh();
+});
+
+socialHealth.addEventListener("click", (event) => {
+  const card = event.target.closest("[data-health-source='trump-truth-direct']");
+  if (!card) return;
+  openTruthHealth();
 });
 
 setClock();

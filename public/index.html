@@ -85,6 +85,21 @@
       </article>
     </template>
 
+    <dialog id="truthHealthDialog" class="health-dialog">
+      <form method="dialog" class="health-dashboard">
+        <header class="dashboard-head">
+          <div>
+            <p class="eyebrow">Critical lane diagnostics</p>
+            <h2>Trump Truth Social Health</h2>
+          </div>
+          <button class="icon-button" value="close" aria-label="Close health dashboard" type="submit">x</button>
+        </header>
+        <div id="truthHealthBody" class="dashboard-body">
+          <div class="empty">Loading Truth Social health.</div>
+        </div>
+      </form>
+    </dialog>
+
     <script type="module" src="/app"></script>
   </body>
 </html>

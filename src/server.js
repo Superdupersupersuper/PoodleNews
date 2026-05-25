@@ -35,6 +35,22 @@ const runtimeSources = await loadRuntimeSources();
 sources.whiteHouseX = [...(sources.whiteHouseX ?? []), ...(runtimeSources.whiteHouseX ?? [])];
 
 const eventClients = new Set();
+const truthWebhookHealth = {
+  configured: Boolean(process.env.TRUTH_WEBHOOK_SECRET),
+  lastSeenAt: null,
+  lastPayloadAt: null,
+  lastFreshAt: null,
+  lastWatcherErrorAt: null,
+  lastWatcherError: null,
+  totalPayloads: 0,
+  totalStatuses: 0,
+  totalFresh: 0,
+  totalMedia: 0,
+  lastReceived: 0,
+  lastFresh: 0,
+  lastMedia: 0,
+  lastWatcher: null
+};
 
 function sendEvent(event, payload) {
   const body = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
@@ -121,15 +137,61 @@ async function receiveTruthWebhook(req, res) {
   };
   const items = statuses.map((status) => normalizeTruthStatus(source, status));
   const fresh = store.addMany(items);
+  const mediaCount = items.reduce((count, item) => count + (item.media?.length ?? 0), 0);
+  const now = new Date().toISOString();
+  truthWebhookHealth.configured = Boolean(configuredSecret);
+  truthWebhookHealth.lastSeenAt = now;
+  truthWebhookHealth.lastPayloadAt = statuses.length > 0 ? now : truthWebhookHealth.lastPayloadAt;
+  truthWebhookHealth.lastFreshAt = fresh.length > 0 ? now : truthWebhookHealth.lastFreshAt;
+  truthWebhookHealth.totalPayloads += 1;
+  truthWebhookHealth.totalStatuses += items.length;
+  truthWebhookHealth.totalFresh += fresh.length;
+  truthWebhookHealth.totalMedia += mediaCount;
+  truthWebhookHealth.lastReceived = items.length;
+  truthWebhookHealth.lastFresh = fresh.length;
+  truthWebhookHealth.lastMedia = mediaCount;
+  truthWebhookHealth.lastWatcher = body.watcher ?? null;
+  if (body.watcher?.error) {
+    truthWebhookHealth.lastWatcherErrorAt = now;
+    truthWebhookHealth.lastWatcherError = body.watcher.error;
+  } else if (body.watcher) {
+    truthWebhookHealth.lastWatcherError = null;
+  }
   if (fresh.length > 0) {
     await store.persist();
     sendEvent("items", {
-      at: new Date().toISOString(),
+      at: now,
       sourceId: source.id,
       items: fresh
     });
   }
   sendJson(res, { received: items.length, fresh: fresh.length });
+}
+
+function truthHealth() {
+  const sourceStatus = ingestor.getStatus().find((entry) => entry.source.id === "trump-truth-direct") ?? null;
+  const pollMs = truthWebhookHealth.lastWatcher?.pollMs
+    ?? sourceStatus?.source?.pollMs
+    ?? sourceStatus?.pollMs
+    ?? 500;
+  const truthLatencyMs = truthWebhookHealth.lastWatcher?.truthLatencyMs ?? null;
+  const webhookLatencyMs = truthWebhookHealth.lastWatcher?.webhookLatencyMs ?? null;
+  const expectedPushMs = {
+    optimistic: Math.max(50, Math.round((pollMs / 2) + (truthLatencyMs ?? 0) + (webhookLatencyMs ?? 0))),
+    worstTypical: Math.max(50, Math.round(pollMs + (truthLatencyMs ?? 0) + (webhookLatencyMs ?? 0)))
+  };
+
+  return {
+    now: new Date().toISOString(),
+    source: sourceStatus,
+    webhook: truthWebhookHealth,
+    expectedPushMs,
+    notes: [
+      "Render direct polling is a fallback and may be Cloudflare-blocked.",
+      "The dedicated watcher reports health only after it is running with the webhook URL and shared secret.",
+      "Expected push time is poll wait plus Truth response time plus webhook/SSE/app refresh time."
+    ]
+  };
 }
 
 async function serveStatic(req, res) {
@@ -174,6 +236,11 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === "/api/sources") {
     sendJson(res, { sources: ingestor.getStatus() });
+    return;
+  }
+
+  if (url.pathname === "/api/truth-health") {
+    sendJson(res, truthHealth());
     return;
   }
 
