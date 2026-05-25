@@ -54,6 +54,22 @@
         </div>
         <section id="headlineFeed" class="feed empty-feed"></section>
       </section>
+
+      <section class="column white-house-column">
+        <header class="column-head">
+          <div>
+            <p class="eyebrow">Press pool</p>
+            <h2>White House X</h2>
+          </div>
+          <span id="whiteHouseCount" class="counter">0</span>
+        </header>
+        <form id="accountForm" class="account-form">
+          <input id="accountInput" type="text" placeholder="@handle or x.com/profile">
+          <button type="submit">Add</button>
+        </form>
+        <div id="whiteHouseAccounts" class="account-list"></div>
+        <section id="whiteHouseFeed" class="feed empty-feed"></section>
+      </section>
     </main>
 
     <template id="itemTemplate">

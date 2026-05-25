@@ -39,6 +39,6 @@ export async function fetchXUser(source, cache) {
     url: `https://x.com/${source.username}/status/${post.id}`,
     publishedAt: post.created_at,
     priority: source.priority ?? 90,
-    tags: ["critical", "x"]
+    tags: source.tags ?? ["critical", "x"]
   }));
 }

@@ -17,6 +17,44 @@
       "priority": 95
     }
   ],
+  "whiteHouseX": [
+    {
+      "id": "x-whpresspool",
+      "type": "x-user",
+      "label": "WHPressPool",
+      "username": "WHPressPool",
+      "pollMs": 10000,
+      "priority": 80,
+      "tags": ["white-house", "x"]
+    },
+    {
+      "id": "x-libbeydean",
+      "type": "x-user",
+      "label": "LibbeyDean_",
+      "username": "LibbeyDean_",
+      "pollMs": 10000,
+      "priority": 78,
+      "tags": ["white-house", "x"]
+    },
+    {
+      "id": "x-presssec",
+      "type": "x-user",
+      "label": "PressSec",
+      "username": "PressSec",
+      "pollMs": 8000,
+      "priority": 84,
+      "tags": ["white-house", "x"]
+    },
+    {
+      "id": "x-rapidresponse47",
+      "type": "x-user",
+      "label": "RapidResponse47",
+      "username": "RapidResponse47",
+      "pollMs": 8000,
+      "priority": 82,
+      "tags": ["white-house", "x"]
+    }
+  ],
   "rss": [
     {
       "id": "aljazeera",

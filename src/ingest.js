@@ -14,19 +14,32 @@ export class Ingestor {
     this.sources = sources;
     this.cache = {};
     this.status = new Map();
-    this.timers = [];
+    this.timers = new Map();
   }
 
   allSources() {
-    return [...(this.sources.critical ?? []), ...(this.sources.rss ?? [])];
+    return Object.values(this.sources).flat().filter((source) => source?.id);
   }
 
   start() {
     for (const source of this.allSources()) {
-      this.poll(source);
-      const timer = setInterval(() => this.poll(source), source.pollMs ?? 30000);
-      this.timers.push(timer);
+      this.addSource(source);
     }
+  }
+
+  addSource(source) {
+    if (!source?.id || this.timers.has(source.id)) return;
+    this.poll(source);
+    const timer = setInterval(() => this.poll(source), source.pollMs ?? 30000);
+    this.timers.set(source.id, { source, timer });
+  }
+
+  removeSource(sourceId) {
+    const entry = this.timers.get(sourceId);
+    if (!entry) return;
+    clearInterval(entry.timer);
+    this.timers.delete(sourceId);
+    this.status.delete(sourceId);
   }
 
   async poll(source) {
@@ -58,7 +71,7 @@ export class Ingestor {
   }
 
   getStatus() {
-    return this.allSources().map((source) => {
+    return [...this.timers.values()].map(({ source }) => {
       return this.status.get(source.id) ?? {
         ok: null,
         source,

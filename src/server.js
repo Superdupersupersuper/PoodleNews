@@ -1,5 +1,5 @@
 import http from "node:http";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { NewsStore } from "./store.js";
@@ -13,8 +13,25 @@ const host = process.env.HOST ?? "127.0.0.1";
 
 const sources = JSON.parse(await readFile(path.join(root, "config", "sources.json"), "utf8"));
 const watchlist = JSON.parse(await readFile(path.join(root, "config", "watchlist.json"), "utf8"));
+const runtimeSourcesPath = path.join(root, "data", "runtime-sources.json");
 const store = new NewsStore();
 await store.load();
+await mkdir(path.dirname(runtimeSourcesPath), { recursive: true });
+
+async function loadRuntimeSources() {
+  try {
+    return JSON.parse(await readFile(runtimeSourcesPath, "utf8"));
+  } catch {
+    return { whiteHouseX: [] };
+  }
+}
+
+async function saveRuntimeSources(value) {
+  await writeFile(runtimeSourcesPath, JSON.stringify(value, null, 2));
+}
+
+const runtimeSources = await loadRuntimeSources();
+sources.whiteHouseX = [...(sources.whiteHouseX ?? []), ...(runtimeSources.whiteHouseX ?? [])];
 
 const ingestor = new Ingestor({ store, sources });
 ingestor.start();
@@ -29,6 +46,30 @@ const contentTypes = {
 function sendJson(res, value) {
   res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(value));
+}
+
+async function readJsonBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const raw = Buffer.concat(chunks).toString("utf8");
+  return raw ? JSON.parse(raw) : {};
+}
+
+function normalizeHandle(value = "") {
+  return value.trim().replace(/^https?:\/\/(www\.)?x\.com\//i, "").replace(/^@/, "").split(/[/?#]/)[0];
+}
+
+function whiteHouseSource(handle) {
+  const username = normalizeHandle(handle);
+  return {
+    id: `x-${username.toLowerCase().replace(/[^a-z0-9_]/g, "")}`,
+    type: "x-user",
+    label: username,
+    username,
+    pollMs: 10000,
+    priority: 78,
+    tags: ["white-house", "x", "runtime"]
+  };
 }
 
 async function serveStatic(req, res) {
@@ -73,6 +114,51 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === "/api/sources") {
     sendJson(res, { sources: ingestor.getStatus() });
+    return;
+  }
+
+  if (url.pathname === "/api/white-house-x" && req.method === "GET") {
+    sendJson(res, {
+      accounts: ingestor.getStatus()
+        .map((entry) => entry.source)
+        .filter((source) => source.tags?.includes("white-house"))
+    });
+    return;
+  }
+
+  if (url.pathname === "/api/white-house-x" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      const source = whiteHouseSource(body.handle ?? "");
+      if (!source.username) {
+        res.writeHead(400);
+        res.end("Missing handle");
+        return;
+      }
+      runtimeSources.whiteHouseX ??= [];
+      const exists = [...(sources.whiteHouseX ?? []), ...runtimeSources.whiteHouseX].some((item) => item.id === source.id);
+      if (!exists) {
+        runtimeSources.whiteHouseX.push(source);
+        sources.whiteHouseX.push(source);
+        ingestor.addSource(source);
+        await saveRuntimeSources(runtimeSources);
+      }
+      sendJson(res, { account: source });
+    } catch (error) {
+      res.writeHead(400);
+      res.end(error.message);
+    }
+    return;
+  }
+
+  if (url.pathname.startsWith("/api/white-house-x/") && req.method === "DELETE") {
+    const handle = decodeURIComponent(url.pathname.split("/").pop() ?? "");
+    const source = whiteHouseSource(handle);
+    runtimeSources.whiteHouseX = (runtimeSources.whiteHouseX ?? []).filter((item) => item.id !== source.id);
+    sources.whiteHouseX = (sources.whiteHouseX ?? []).filter((item) => item.id !== source.id);
+    ingestor.removeSource(source.id);
+    await saveRuntimeSources(runtimeSources);
+    sendJson(res, { ok: true });
     return;
   }
 

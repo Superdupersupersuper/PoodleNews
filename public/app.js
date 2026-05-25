@@ -1,13 +1,18 @@
 const socialFeed = document.querySelector("#socialFeed");
 const headlineFeed = document.querySelector("#headlineFeed");
+const whiteHouseFeed = document.querySelector("#whiteHouseFeed");
 const socialHealth = document.querySelector("#socialHealth");
+const whiteHouseAccounts = document.querySelector("#whiteHouseAccounts");
 const keywordsEl = document.querySelector("#keywords");
+const accountForm = document.querySelector("#accountForm");
+const accountInput = document.querySelector("#accountInput");
 const itemTemplate = document.querySelector("#itemTemplate");
 const search = document.querySelector("#search");
 const itemCount = document.querySelector("#itemCount");
 const lastUpdate = document.querySelector("#lastUpdate");
 const socialCount = document.querySelector("#socialCount");
 const headlineCount = document.querySelector("#headlineCount");
+const whiteHouseCount = document.querySelector("#whiteHouseCount");
 const clock = document.querySelector("#clock");
 
 let items = [];
@@ -15,6 +20,10 @@ let sources = [];
 let headlineKeywords = [];
 
 const socialSourceIds = new Set(["trump-truth-provider", "trump-x"]);
+
+function isWhiteHouseSource(source) {
+  return source.tags?.includes("white-house");
+}
 
 function timeAgo(value) {
   const then = new Date(value).getTime();
@@ -60,6 +69,31 @@ function renderHealth(rows) {
       ${row.error ? `<div class="item-meta">${row.error}</div>` : ""}
     `;
     socialHealth.append(el);
+  }
+}
+
+function renderWhiteHouseAccounts(rows) {
+  whiteHouseAccounts.replaceChildren();
+  const whiteHouseRows = rows.filter((entry) => isWhiteHouseSource(entry.source));
+  for (const row of whiteHouseRows) {
+    const card = document.createElement("div");
+    card.className = "account-card";
+    const dotClass = row.ok === true ? "ok" : row.ok === false ? "bad" : "";
+    const removable = row.source.tags?.includes("runtime");
+    card.innerHTML = `
+      <div>
+        <div class="source-head">
+          <strong>@${row.source.username}</strong>
+          <span class="dot ${dotClass}"></span>
+        </div>
+        <div class="item-meta">
+          <span>${row.latencyMs ?? "-"}ms</span>
+          <span>${row.lastPollAt ? timeAgo(row.lastPollAt) : "pending"}</span>
+        </div>
+      </div>
+      ${removable ? `<button class="remove-account" type="button" data-handle="${row.source.username}">Remove</button>` : ""}
+    `;
+    whiteHouseAccounts.append(card);
   }
 }
 
@@ -131,12 +165,18 @@ function renderItems() {
     .filter(keywordMatch)
     .filter((item) => itemMatchesSearch(item, query));
 
+  const whiteHouseItems = items
+    .filter((item) => item.tags?.includes("white-house"))
+    .filter((item) => itemMatchesSearch(item, query));
+
   renderFeed(socialFeed, socialItems, "Waiting for Trump Truth Social / X posts.");
   renderFeed(headlineFeed, headlineItems, "No watched headlines yet.");
+  renderFeed(whiteHouseFeed, whiteHouseItems, "Waiting for configured White House X accounts.");
 
   socialCount.textContent = socialItems.length;
   headlineCount.textContent = headlineItems.length;
-  itemCount.textContent = `${socialItems.length + headlineItems.length} shown`;
+  whiteHouseCount.textContent = whiteHouseItems.length;
+  itemCount.textContent = `${socialItems.length + headlineItems.length + whiteHouseItems.length} shown`;
 }
 
 async function refresh() {
@@ -149,12 +189,32 @@ async function refresh() {
   sources = (await sourcesResponse.json()).sources;
   headlineKeywords = (await watchlistResponse.json()).headlineKeywords ?? [];
   renderHealth(sources);
+  renderWhiteHouseAccounts(sources);
   renderKeywords();
   renderItems();
   lastUpdate.textContent = `Updated ${timeAgo(new Date().toISOString())}`;
 }
 
 search.addEventListener("input", renderItems);
+accountForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const handle = accountInput.value.trim();
+  if (!handle) return;
+  accountInput.value = "";
+  await fetch("/api/white-house-x", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ handle })
+  });
+  await refresh();
+});
+
+whiteHouseAccounts.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-handle]");
+  if (!button) return;
+  await fetch(`/api/white-house-x/${encodeURIComponent(button.dataset.handle)}`, { method: "DELETE" });
+  await refresh();
+});
 
 setClock();
 setInterval(setClock, 1000);
