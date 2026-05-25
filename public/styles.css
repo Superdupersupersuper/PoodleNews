@@ -372,6 +372,17 @@ button.health-card:hover {
   text-decoration: underline;
 }
 
+.title[data-expandable-social="true"] {
+  cursor: pointer;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.title[data-expandable-social="true"]:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .summary {
   color: #c3cac3;
   font-size: 12px;

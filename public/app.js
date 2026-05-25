@@ -17,9 +17,12 @@ const clock = document.querySelector("#clock");
 const truthHealthDialog = document.querySelector("#truthHealthDialog");
 const truthHealthBody = document.querySelector("#truthHealthBody");
 
+const SOCIAL_PREVIEW_CHARS = 280;
+
 let items = [];
 let sources = [];
 let headlineKeywords = [];
+let expandedSocialItemIds = new Set();
 
 const socialSourceIds = new Set(["trump-truth-direct", "trump-truth-x-mirror", "trump-x"]);
 let refreshInFlight = false;
@@ -275,6 +278,23 @@ function itemMatchesSearch(item, query) {
   return `${item.title} ${item.summary || ""} ${item.sourceLabel}`.toLowerCase().includes(query);
 }
 
+function socialDisplayText(item) {
+  const fullText = sanitizeText(item.summary || item.title || "");
+  if (fullText.length <= SOCIAL_PREVIEW_CHARS) {
+    return {
+      fullText,
+      previewText: fullText,
+      expandable: false
+    };
+  }
+
+  return {
+    fullText,
+    previewText: `${fullText.slice(0, SOCIAL_PREVIEW_CHARS).trimEnd()}...`,
+    expandable: true
+  };
+}
+
 function renderFeed(target, visible, emptyText) {
   target.replaceChildren();
   target.classList.toggle("empty-feed", visible.length === 0);
@@ -289,16 +309,35 @@ function renderFeed(target, visible, emptyText) {
   for (const item of visible) {
     const node = itemTemplate.content.cloneNode(true);
     const article = node.querySelector(".item");
+    const isSocialPost = item.type === "social-post";
     article.classList.add(item.tags.includes("critical") ? "critical" : "headline");
     node.querySelector(".source").textContent = item.sourceLabel;
     node.querySelector(".age").textContent = timeAgo(item.publishedAt || item.createdAt);
     const title = node.querySelector(".title");
-    title.textContent = sanitizeText(item.title);
     title.href = item.url || "#";
     const summary = node.querySelector(".summary");
-    const summaryText = sanitizeText(item.summary || "");
-    summary.textContent = summaryText;
-    summary.hidden = !summaryText || summaryText === sanitizeText(item.title);
+
+    if (isSocialPost) {
+      const socialText = socialDisplayText(item);
+      const expanded = socialText.expandable && expandedSocialItemIds.has(item.id);
+      title.textContent = expanded ? socialText.fullText : socialText.previewText;
+      summary.hidden = true;
+
+      if (socialText.expandable) {
+        title.dataset.expandableSocial = "true";
+        title.dataset.itemId = item.id;
+        title.dataset.previewText = socialText.previewText;
+        title.dataset.fullText = socialText.fullText;
+        title.setAttribute("aria-expanded", String(expanded));
+        title.title = expanded ? "Collapse post" : "Expand post";
+      }
+    } else {
+      title.textContent = sanitizeText(item.title);
+      const summaryText = sanitizeText(item.summary || "");
+      summary.textContent = summaryText;
+      summary.hidden = !summaryText || summaryText === sanitizeText(item.title);
+    }
+
     const tags = node.querySelector(".tags");
     for (const tag of item.tags ?? []) {
       const pill = document.createElement("span");
@@ -332,6 +371,23 @@ function renderFeed(target, visible, emptyText) {
     }
     media.hidden = media.childElementCount === 0;
     target.append(node);
+  }
+}
+
+function toggleSocialPost(event) {
+  const title = event.target.closest("[data-expandable-social='true']");
+  if (!title) return;
+
+  event.preventDefault();
+  const expanded = title.getAttribute("aria-expanded") === "true";
+  title.textContent = expanded ? title.dataset.previewText : title.dataset.fullText;
+  title.setAttribute("aria-expanded", String(!expanded));
+  title.title = expanded ? "Expand post" : "Collapse post";
+
+  if (expanded) {
+    expandedSocialItemIds.delete(title.dataset.itemId);
+  } else {
+    expandedSocialItemIds.add(title.dataset.itemId);
   }
 }
 
@@ -391,6 +447,9 @@ async function refresh() {
 }
 
 search.addEventListener("input", renderItems);
+socialFeed.addEventListener("click", toggleSocialPost);
+whiteHouseFeed.addEventListener("click", toggleSocialPost);
+headlineFeed.addEventListener("click", toggleSocialPost);
 accountForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const handle = accountInput.value.trim();
