@@ -31,7 +31,29 @@ The free Blueprint uses the app's local JSON store for the first skeleton deploy
 
 ## Truth Social latency path
 
-Truth Social's public terms currently restrict automated non-human access, so this project treats Trump Truth Social monitoring as a provider adapter instead of hard-coding brittle scraping. Set:
+The app includes two Truth Social paths:
+
+- Direct in-app polling from Render via the public account statuses endpoint.
+- A webhook endpoint for a dedicated low-latency watcher running from any environment that can reach Truth Social reliably.
+
+Configure the webhook endpoint with:
+
+```bash
+TRUTH_WEBHOOK_SECRET=choose-a-long-random-secret
+```
+
+Then run the watcher from the machine/VPS you want to use:
+
+```bash
+POODLENEWS_TRUTH_WEBHOOK_URL=https://news-aggregator-zujo.onrender.com/api/webhooks/truth-social \
+TRUTH_WEBHOOK_SECRET=choose-a-long-random-secret \
+TRUTH_POLL_MS=500 \
+npm run truth:watch
+```
+
+The watcher polls Trump Truth Social, sends new posts to PoodleNews, and includes image/media attachment metadata so the terminal can display images in the Trump lane.
+
+The older provider adapter is still available. Set:
 
 ```bash
 TRUTH_SOCIAL_PROVIDER_URL=https://your-provider.example/posts

@@ -151,6 +151,31 @@ function renderFeed(target, visible, emptyText) {
       pill.textContent = tag;
       tags.append(pill);
     }
+    const media = node.querySelector(".media");
+    for (const asset of item.media ?? []) {
+      const url = asset.previewUrl || asset.url;
+      if (!url) continue;
+      if (asset.type === "image" || asset.type === "gifv" || asset.type === "unknown") {
+        const link = document.createElement("a");
+        link.href = asset.url || url;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        const image = document.createElement("img");
+        image.src = url;
+        image.alt = asset.description || "Truth Social media";
+        image.loading = "lazy";
+        link.append(image);
+        media.append(link);
+      } else {
+        const link = document.createElement("a");
+        link.href = asset.url || url;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        link.textContent = asset.type;
+        media.append(link);
+      }
+    }
+    media.hidden = media.childElementCount === 0;
     target.append(node);
   }
 }

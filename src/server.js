@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { NewsStore } from "./store.js";
 import { Ingestor } from "./ingest.js";
+import { normalizeTruthStatus } from "./sources/truthSocialNormalize.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -89,6 +90,48 @@ function whiteHouseSource(handle) {
   };
 }
 
+const truthWebhookSource = {
+  id: "trump-truth-direct",
+  label: "Trump Truth Social",
+  handle: "realDonaldTrump",
+  priority: 100,
+  tags: ["critical", "truth-social"]
+};
+
+async function receiveTruthWebhook(req, res) {
+  const configuredSecret = process.env.TRUTH_WEBHOOK_SECRET;
+  const providedSecret = req.headers["x-poodlenews-secret"];
+  if (configuredSecret && providedSecret !== configuredSecret) {
+    res.writeHead(401);
+    res.end("Unauthorized");
+    return;
+  }
+  if (!configuredSecret && process.env.NODE_ENV === "production") {
+    res.writeHead(503);
+    res.end("TRUTH_WEBHOOK_SECRET is not configured");
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const statuses = Array.isArray(body) ? body : body.statuses ?? body.items ?? [];
+  const source = {
+    ...truthWebhookSource,
+    handle: body.handle ?? truthWebhookSource.handle,
+    accountId: body.accountId
+  };
+  const items = statuses.map((status) => normalizeTruthStatus(source, status));
+  const fresh = store.addMany(items);
+  if (fresh.length > 0) {
+    await store.persist();
+    sendEvent("items", {
+      at: new Date().toISOString(),
+      sourceId: source.id,
+      items: fresh
+    });
+  }
+  sendJson(res, { received: items.length, fresh: fresh.length });
+}
+
 async function serveStatic(req, res) {
   const requested = new URL(req.url, `http://${req.headers.host}`);
   const routeMap = {
@@ -131,6 +174,16 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === "/api/sources") {
     sendJson(res, { sources: ingestor.getStatus() });
+    return;
+  }
+
+  if (url.pathname === "/api/webhooks/truth-social" && req.method === "POST") {
+    try {
+      await receiveTruthWebhook(req, res);
+    } catch (error) {
+      res.writeHead(400);
+      res.end(error.message);
+    }
     return;
   }
 

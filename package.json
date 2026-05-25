@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node src/server.js",
-    "start": "NODE_ENV=production node src/server.js"
+    "start": "NODE_ENV=production node src/server.js",
+    "truth:watch": "node scripts/truth-watcher.js"
   },
   "engines": {
     "node": ">=20"

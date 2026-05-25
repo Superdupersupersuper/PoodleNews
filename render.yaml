@@ -16,3 +16,5 @@ services:
         sync: false
       - key: TRUTH_SOCIAL_PROVIDER_TOKEN
         sync: false
+      - key: TRUTH_WEBHOOK_SECRET
+        sync: false
