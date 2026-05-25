@@ -23,13 +23,20 @@ export async function fetchXUser(source, cache) {
     max_results: "10",
     "tweet.fields": "created_at,entities"
   });
+  cache.xSince ??= new Map();
+  const sinceId = cache.xSince.get(source.id);
+  if (sinceId) params.set("since_id", sinceId);
+
   const response = await fetch(`https://api.x.com/2/users/${userId}/tweets?${params}`, {
     headers: { authorization: `Bearer ${token}` }
   });
   if (!response.ok) throw new Error(`X timeline returned ${response.status}`);
 
   const payload = await response.json();
-  return (payload.data ?? []).map((post) => ({
+  const posts = payload.data ?? [];
+  if (posts[0]?.id) cache.xSince.set(source.id, posts[0].id);
+
+  return posts.map((post) => ({
     id: `${source.id}:${post.id}`,
     sourceId: source.id,
     sourceLabel: source.label,
