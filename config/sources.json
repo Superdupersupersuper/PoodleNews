@@ -1,12 +1,14 @@
 {
   "critical": [
     {
-      "id": "trump-truth-provider",
-      "type": "truth-provider",
+      "id": "trump-truth-direct",
+      "type": "truth-social-direct",
       "label": "Trump Truth Social",
       "handle": "realDonaldTrump",
-      "pollMs": 1200,
-      "priority": 100
+      "accountId": "107780257626128497",
+      "pollMs": 500,
+      "priority": 100,
+      "tags": ["critical", "truth-social"]
     },
     {
       "id": "trump-x",

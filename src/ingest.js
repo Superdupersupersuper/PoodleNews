@@ -1,20 +1,24 @@
 import { fetchRss } from "./sources/rss.js";
+import { fetchTruthSocialDirect } from "./sources/truthSocialDirect.js";
 import { fetchTruthProvider } from "./sources/truthProvider.js";
 import { fetchXUser } from "./sources/xApi.js";
 
 const sourceHandlers = {
   rss: fetchRss,
+  "truth-social-direct": fetchTruthSocialDirect,
   "truth-provider": fetchTruthProvider,
   "x-user": fetchXUser
 };
 
 export class Ingestor {
-  constructor({ store, sources }) {
+  constructor({ store, sources, onFresh }) {
     this.store = store;
     this.sources = sources;
     this.cache = {};
     this.status = new Map();
     this.timers = new Map();
+    this.inFlight = new Set();
+    this.onFresh = onFresh;
   }
 
   allSources() {
@@ -45,12 +49,15 @@ export class Ingestor {
   async poll(source) {
     const handler = sourceHandlers[source.type];
     if (!handler) return;
+    if (this.inFlight.has(source.id)) return;
 
     const startedAt = Date.now();
+    this.inFlight.add(source.id);
     try {
       const items = await handler(source, this.cache);
       const fresh = this.store.addMany(items);
       if (fresh.length > 0) await this.store.persist();
+      if (fresh.length > 0) this.onFresh?.(fresh, source);
       this.status.set(source.id, {
         ok: true,
         source,
@@ -67,6 +74,8 @@ export class Ingestor {
         latencyMs: Date.now() - startedAt,
         error: error.message
       });
+    } finally {
+      this.inFlight.delete(source.id);
     }
   }
 

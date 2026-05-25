@@ -19,7 +19,9 @@ let items = [];
 let sources = [];
 let headlineKeywords = [];
 
-const socialSourceIds = new Set(["trump-truth-provider", "trump-x"]);
+const socialSourceIds = new Set(["trump-truth-direct", "trump-x"]);
+let refreshInFlight = false;
+let refreshAgain = false;
 
 function isWhiteHouseSource(source) {
   return source.tags?.includes("white-house");
@@ -180,19 +182,32 @@ function renderItems() {
 }
 
 async function refresh() {
-  const [itemsResponse, sourcesResponse, watchlistResponse] = await Promise.all([
-    fetch("/api/items?limit=250"),
-    fetch("/api/sources"),
-    fetch("/api/watchlist")
-  ]);
-  items = (await itemsResponse.json()).items;
-  sources = (await sourcesResponse.json()).sources;
-  headlineKeywords = (await watchlistResponse.json()).headlineKeywords ?? [];
-  renderHealth(sources);
-  renderWhiteHouseAccounts(sources);
-  renderKeywords();
-  renderItems();
-  lastUpdate.textContent = `Updated ${timeAgo(new Date().toISOString())}`;
+  if (refreshInFlight) {
+    refreshAgain = true;
+    return;
+  }
+  refreshInFlight = true;
+  try {
+    const [itemsResponse, sourcesResponse, watchlistResponse] = await Promise.all([
+      fetch("/api/items?limit=250"),
+      fetch("/api/sources"),
+      fetch("/api/watchlist")
+    ]);
+    items = (await itemsResponse.json()).items;
+    sources = (await sourcesResponse.json()).sources;
+    headlineKeywords = (await watchlistResponse.json()).headlineKeywords ?? [];
+    renderHealth(sources);
+    renderWhiteHouseAccounts(sources);
+    renderKeywords();
+    renderItems();
+    lastUpdate.textContent = `Updated ${timeAgo(new Date().toISOString())}`;
+  } finally {
+    refreshInFlight = false;
+    if (refreshAgain) {
+      refreshAgain = false;
+      refresh();
+    }
+  }
 }
 
 search.addEventListener("input", renderItems);
@@ -220,3 +235,6 @@ setClock();
 setInterval(setClock, 1000);
 refresh();
 setInterval(refresh, 2000);
+
+const events = new EventSource("/api/events");
+events.addEventListener("items", () => refresh());

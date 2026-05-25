@@ -33,7 +33,24 @@ async function saveRuntimeSources(value) {
 const runtimeSources = await loadRuntimeSources();
 sources.whiteHouseX = [...(sources.whiteHouseX ?? []), ...(runtimeSources.whiteHouseX ?? [])];
 
-const ingestor = new Ingestor({ store, sources });
+const eventClients = new Set();
+
+function sendEvent(event, payload) {
+  const body = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
+  for (const client of eventClients) {
+    client.write(body);
+  }
+}
+
+const ingestor = new Ingestor({
+  store,
+  sources,
+  onFresh: (items, source) => sendEvent("items", {
+    at: new Date().toISOString(),
+    sourceId: source.id,
+    items
+  })
+});
 ingestor.start();
 
 const contentTypes = {
@@ -114,6 +131,22 @@ const server = http.createServer(async (req, res) => {
 
   if (url.pathname === "/api/sources") {
     sendJson(res, { sources: ingestor.getStatus() });
+    return;
+  }
+
+  if (url.pathname === "/api/events") {
+    res.writeHead(200, {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive"
+    });
+    res.write(": connected\n\n");
+    eventClients.add(res);
+    const heartbeat = setInterval(() => res.write(": heartbeat\n\n"), 15000);
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      eventClients.delete(res);
+    });
     return;
   }
 
