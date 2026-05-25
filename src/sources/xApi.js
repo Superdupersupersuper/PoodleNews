@@ -20,8 +20,9 @@ export async function fetchXUser(source, cache) {
   }
 
   const params = new URLSearchParams({
+    exclude: "replies",
     max_results: "10",
-    "tweet.fields": "created_at,entities"
+    "tweet.fields": "created_at,entities,referenced_tweets"
   });
   cache.xSince ??= new Map();
   const sinceId = cache.xSince.get(source.id);
