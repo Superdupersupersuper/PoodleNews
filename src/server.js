@@ -32,7 +32,12 @@ function sendJson(res, value) {
 
 async function serveStatic(req, res) {
   const requested = new URL(req.url, `http://${req.headers.host}`);
-  const pathname = requested.pathname === "/" ? "/index.html" : requested.pathname;
+  const routeMap = {
+    "/": "/index.html",
+    "/app": "/app.js",
+    "/styles": "/styles.css"
+  };
+  const pathname = routeMap[requested.pathname] ?? requested.pathname;
   const filePath = path.normalize(path.join(publicDir, pathname));
   if (!filePath.startsWith(publicDir)) {
     res.writeHead(403);
