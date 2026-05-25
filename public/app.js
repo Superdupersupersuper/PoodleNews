@@ -21,7 +21,7 @@ let items = [];
 let sources = [];
 let headlineKeywords = [];
 
-const socialSourceIds = new Set(["trump-truth-direct", "trump-x"]);
+const socialSourceIds = new Set(["trump-truth-direct", "trump-truth-x-mirror", "trump-x"]);
 let refreshInFlight = false;
 let refreshAgain = false;
 let truthHealthTimer = null;

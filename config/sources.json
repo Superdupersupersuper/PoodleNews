@@ -17,6 +17,15 @@
       "username": "realDonaldTrump",
       "pollMs": 5000,
       "priority": 95
+    },
+    {
+      "id": "trump-truth-x-mirror",
+      "type": "x-user",
+      "label": "Truth Mirror X",
+      "username": "JustTrumpTruth",
+      "pollMs": 5000,
+      "priority": 98,
+      "tags": ["critical", "x", "truth-social", "mirror"]
     }
   ],
   "whiteHouseX": [
