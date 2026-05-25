@@ -11,6 +11,7 @@ const root = path.resolve(__dirname, "..");
 const publicDir = path.join(root, "public");
 const port = Number(process.env.PORT ?? 4173);
 const host = process.env.HOST ?? "127.0.0.1";
+const appStartedAt = new Date();
 
 const sources = JSON.parse(await readFile(path.join(root, "config", "sources.json"), "utf8"));
 const watchlist = JSON.parse(await readFile(path.join(root, "config", "watchlist.json"), "utf8"));
@@ -183,6 +184,11 @@ function truthHealth() {
 
   return {
     now: new Date().toISOString(),
+    app: {
+      startedAt: appStartedAt.toISOString(),
+      uptimeMs: Date.now() - appStartedAt.getTime(),
+      eventClients: eventClients.size
+    },
     source: sourceStatus,
     webhook: truthWebhookHealth,
     expectedPushMs,

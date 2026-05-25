@@ -557,6 +557,73 @@ button.health-card:hover {
   line-height: 1.35;
 }
 
+.heartbeat-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+  background: linear-gradient(#171a17, #101210);
+}
+
+.heartbeat-pulse {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 0 0 rgba(215, 182, 95, 0.5);
+  animation: heartbeat 1s infinite;
+}
+
+.heartbeat-pulse.ok {
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(86, 209, 123, 0.55);
+}
+
+.heartbeat-pulse.bad {
+  background: var(--danger);
+  box-shadow: 0 0 0 0 rgba(227, 106, 92, 0.55);
+}
+
+.heartbeat-bar div:not(.heartbeat-pulse) {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.heartbeat-bar strong {
+  font-size: 11px;
+}
+
+.heartbeat-bar span {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes heartbeat {
+  0% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 currentColor;
+  }
+
+  65% {
+    transform: scale(1);
+    box-shadow: 0 0 0 7px transparent;
+  }
+
+  100% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
 @media (max-width: 860px) {
   body {
     overflow: auto;
@@ -585,5 +652,9 @@ button.health-card:hover {
 
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .heartbeat-bar {
+    grid-template-columns: auto 1fr;
   }
 }

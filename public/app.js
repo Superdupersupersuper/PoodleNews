@@ -24,6 +24,7 @@ let headlineKeywords = [];
 const socialSourceIds = new Set(["trump-truth-direct", "trump-x"]);
 let refreshInFlight = false;
 let refreshAgain = false;
+let truthHealthTimer = null;
 
 function isWhiteHouseSource(source) {
   return source.tags?.includes("white-house");
@@ -75,6 +76,23 @@ function metric(label, value, hint = "") {
   `;
 }
 
+function heartbeatStatus(health) {
+  const webhook = health.webhook ?? {};
+  const watcher = webhook.lastWatcher ?? {};
+  const direct = health.source;
+  const nowMs = new Date(health.now).getTime();
+  const watcherAgeMs = webhook.lastSeenAt ? nowMs - new Date(webhook.lastSeenAt).getTime() : null;
+  const watcherLive = watcherAgeMs != null && watcherAgeMs < Math.max(15000, (watcher.pollMs ?? 500) * 8) && watcher.ok !== false;
+  return {
+    apiLive: Boolean(health.app?.startedAt),
+    watcherLive,
+    watcherAgeMs,
+    directLive: Boolean(direct?.lastPollAt),
+    directBlocked: direct?.ok === false,
+    directError: direct?.error ?? null
+  };
+}
+
 function renderHealth(rows) {
   socialHealth.replaceChildren();
   for (const row of rows.filter((entry) => socialSourceIds.has(entry.source.id))) {
@@ -108,14 +126,11 @@ function statusText(ok) {
   return "Pending";
 }
 
-async function openTruthHealth() {
-  truthHealthDialog.showModal();
-  truthHealthBody.innerHTML = `<div class="empty">Loading Truth Social health.</div>`;
-  const response = await fetch("/api/truth-health");
-  const health = await response.json();
+function renderTruthHealthDashboard(health) {
   const direct = health.source;
   const webhook = health.webhook ?? {};
   const watcher = webhook.lastWatcher ?? {};
+  const heartbeat = heartbeatStatus(health);
   const directStats = direct?.stats ?? {};
   const watcherAge = webhook.lastSeenAt ? timeAgo(webhook.lastSeenAt) : "never";
   const directAge = direct?.lastPollAt ? timeAgo(direct.lastPollAt) : "pending";
@@ -123,6 +138,10 @@ async function openTruthHealth() {
   const hasWatcher = Boolean(webhook.lastSeenAt);
   const directDot = direct?.ok === true ? "ok" : direct?.ok === false ? "bad" : "";
   const watcherDot = watcher.ok === true ? "ok" : watcher.ok === false ? "bad" : hasWatcher ? "ok" : "bad";
+  const uptime = health.app?.uptimeMs ? formatMs(health.app.uptimeMs) : "-";
+  const fallbackMessage = direct?.error?.includes("403")
+    ? "Render fallback is blocked by Truth Social/Cloudflare. Use the dedicated watcher for low latency."
+    : direct?.error;
 
   truthHealthBody.innerHTML = `
     <section class="dashboard-section">
@@ -150,7 +169,7 @@ async function openTruthHealth() {
       <div class="section-title">
         <span class="dot ${directDot}"></span>
         <div>
-          <h3>Render Direct Poller</h3>
+          <h3>Render Fallback Poller</h3>
           <p>${statusText(direct?.ok)} · last poll ${directAge}</p>
         </div>
       </div>
@@ -160,7 +179,7 @@ async function openTruthHealth() {
         ${metric("Total polls", formatNumber(directStats.totalPolls), `${formatNumber(directStats.failedPolls)} failed`)}
         ${metric("Fresh posts", formatNumber(directStats.freshTotal), "Accepted by feed")}
       </div>
-      ${direct?.error ? `<div class="alert-line">${sanitizeText(direct.error)}</div>` : ""}
+      ${fallbackMessage ? `<div class="alert-line">${sanitizeText(fallbackMessage)}</div>` : ""}
     </section>
 
     <section class="dashboard-section">
@@ -178,7 +197,36 @@ async function openTruthHealth() {
         ${metric("Last fresh", webhook.lastFreshAt ? timeAgo(webhook.lastFreshAt) : "none", "New item accepted")}
       </div>
     </section>
+
+    <footer class="heartbeat-bar">
+      <div class="heartbeat-pulse ${heartbeat.apiLive ? "ok" : "bad"}"></div>
+      <div>
+        <strong>Dashboard heartbeat</strong>
+        <span>API live · uptime ${uptime} · refreshed ${timeAgo(health.now)}</span>
+      </div>
+      <div>
+        <strong>Watcher</strong>
+        <span>${heartbeat.watcherLive ? `live · ${watcherAge}` : hasWatcher ? `stale · ${watcherAge}` : "not reporting yet"}</span>
+      </div>
+      <div>
+        <strong>Fallback</strong>
+        <span>${heartbeat.directBlocked ? "blocked by 403" : heartbeat.directLive ? "polling" : "pending"}</span>
+      </div>
+    </footer>
   `;
+}
+
+async function refreshTruthHealthDashboard() {
+  const response = await fetch("/api/truth-health");
+  renderTruthHealthDashboard(await response.json());
+}
+
+async function openTruthHealth() {
+  truthHealthDialog.showModal();
+  truthHealthBody.innerHTML = `<div class="empty">Loading Truth Social health.</div>`;
+  await refreshTruthHealthDashboard();
+  clearInterval(truthHealthTimer);
+  truthHealthTimer = setInterval(refreshTruthHealthDashboard, 1000);
 }
 
 function renderWhiteHouseAccounts(rows) {
@@ -367,6 +415,11 @@ socialHealth.addEventListener("click", (event) => {
   const card = event.target.closest("[data-health-source='trump-truth-direct']");
   if (!card) return;
   openTruthHealth();
+});
+
+truthHealthDialog.addEventListener("close", () => {
+  clearInterval(truthHealthTimer);
+  truthHealthTimer = null;
 });
 
 setClock();
