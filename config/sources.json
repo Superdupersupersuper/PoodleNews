@@ -1,0 +1,46 @@
+{
+  "critical": [
+    {
+      "id": "trump-truth-provider",
+      "type": "truth-provider",
+      "label": "Trump Truth Social",
+      "handle": "realDonaldTrump",
+      "pollMs": 1200,
+      "priority": 100
+    },
+    {
+      "id": "trump-x",
+      "type": "x-user",
+      "label": "Trump X",
+      "username": "realDonaldTrump",
+      "pollMs": 5000,
+      "priority": 95
+    }
+  ],
+  "rss": [
+    {
+      "id": "aljazeera",
+      "type": "rss",
+      "label": "Al Jazeera",
+      "url": "https://www.aljazeera.com/xml/rss/all.xml",
+      "pollMs": 30000,
+      "priority": 55
+    },
+    {
+      "id": "bbc-world",
+      "type": "rss",
+      "label": "BBC World",
+      "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+      "pollMs": 30000,
+      "priority": 50
+    },
+    {
+      "id": "guardian-world",
+      "type": "rss",
+      "label": "Guardian World",
+      "url": "https://www.theguardian.com/world/rss",
+      "pollMs": 45000,
+      "priority": 48
+    }
+  ]
+}

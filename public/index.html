@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>News Aggregator</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <aside class="rail">
+      <div class="brand">
+        <div class="mark">NA</div>
+        <div>
+          <h1>News Aggregator</h1>
+          <p id="clock">--:--:--</p>
+        </div>
+      </div>
+      <div class="controls">
+        <label>
+          <span>Search</span>
+          <input id="search" type="search" placeholder="Ticker, person, keyword">
+        </label>
+        <label>
+          <span>Source</span>
+          <select id="sourceFilter">
+            <option value="">All sources</option>
+          </select>
+        </label>
+        <div class="toggles">
+          <button class="is-active" data-filter="all">All</button>
+          <button data-filter="critical">Critical</button>
+          <button data-filter="headline">Headlines</button>
+        </div>
+      </div>
+      <section>
+        <h2>Source Health</h2>
+        <div id="sources" class="sources"></div>
+      </section>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Live feed</p>
+          <h2>Market-moving headlines</h2>
+        </div>
+        <div class="stats">
+          <span id="itemCount">0 items</span>
+          <span id="lastUpdate">Waiting</span>
+        </div>
+      </header>
+      <section id="feed" class="feed"></section>
+    </main>
+
+    <template id="itemTemplate">
+      <article class="item">
+        <div class="item-meta">
+          <span class="source"></span>
+          <span class="age"></span>
+        </div>
+        <a class="title" target="_blank" rel="noreferrer"></a>
+        <p class="summary"></p>
+        <div class="tags"></div>
+      </article>
+    </template>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: news-aggregator
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: NODE_ENV
+        value: production
+      - key: X_BEARER_TOKEN
+        sync: false
+      - key: TRUTH_SOCIAL_PROVIDER_URL
+        sync: false
+      - key: TRUTH_SOCIAL_PROVIDER_TOKEN
+        sync: false
+    disk:
+      name: news-aggregator-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
