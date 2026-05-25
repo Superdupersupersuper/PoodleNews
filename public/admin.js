@@ -52,14 +52,12 @@ function accountRow(row) {
   detail.append(head, meta);
   account.append(detail);
 
-  if (row.removable) {
-    const remove = document.createElement("button");
-    remove.className = "remove-account";
-    remove.type = "button";
-    remove.dataset.handle = row.source.username;
-    remove.textContent = "Remove";
-    account.append(remove);
-  }
+  const remove = document.createElement("button");
+  remove.className = "remove-account";
+  remove.type = "button";
+  remove.dataset.handle = row.source.username;
+  remove.textContent = "Remove";
+  account.append(remove);
 
   return account;
 }

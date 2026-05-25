@@ -13,7 +13,8 @@ const port = Number(process.env.PORT ?? 4173);
 const host = process.env.HOST ?? "127.0.0.1";
 const appStartedAt = new Date();
 
-const sources = JSON.parse(await readFile(path.join(root, "config", "sources.json"), "utf8"));
+const configuredSources = JSON.parse(await readFile(path.join(root, "config", "sources.json"), "utf8"));
+const sources = JSON.parse(JSON.stringify(configuredSources));
 const watchlist = JSON.parse(await readFile(path.join(root, "config", "watchlist.json"), "utf8"));
 const runtimeSourcesPath = path.join(root, "data", "runtime-sources.json");
 const store = new NewsStore();
@@ -25,10 +26,21 @@ async function loadRuntimeSources() {
     const value = JSON.parse(await readFile(runtimeSourcesPath, "utf8"));
     return {
       whiteHouseX: value.whiteHouseX ?? [],
-      headlineX: value.headlineX ?? []
+      headlineX: value.headlineX ?? [],
+      removed: {
+        whiteHouseX: value.removed?.whiteHouseX ?? [],
+        headlineX: value.removed?.headlineX ?? []
+      }
     };
   } catch {
-    return { whiteHouseX: [], headlineX: [] };
+    return {
+      whiteHouseX: [],
+      headlineX: [],
+      removed: {
+        whiteHouseX: [],
+        headlineX: []
+      }
+    };
   }
 }
 
@@ -61,7 +73,13 @@ const xListDefinitions = {
 
 for (const listId of Object.keys(xListDefinitions)) {
   runtimeSources[listId] ??= [];
-  sources[listId] = [...(sources[listId] ?? []), ...runtimeSources[listId]];
+  runtimeSources.removed ??= {};
+  runtimeSources.removed[listId] ??= [];
+  const removedIds = new Set(runtimeSources.removed[listId]);
+  sources[listId] = [
+    ...(configuredSources[listId] ?? []).filter((source) => !removedIds.has(source.id)),
+    ...runtimeSources[listId]
+  ];
 }
 
 const eventClients = new Set();
@@ -143,15 +161,24 @@ function whiteHouseSource(handle) {
   return xSourceForList("whiteHouseX", handle);
 }
 
+function configuredSourceForList(listId, sourceId) {
+  return (configuredSources[listId] ?? []).find((source) => source.id === sourceId) ?? null;
+}
+
+function removeRuntimeSource(listId, sourceId) {
+  const before = runtimeSources[listId]?.length ?? 0;
+  runtimeSources[listId] = (runtimeSources[listId] ?? []).filter((item) => item.id !== sourceId);
+  return (runtimeSources[listId]?.length ?? 0) !== before;
+}
+
 function xListPayload() {
   const statusRows = ingestor.getStatus();
   return Object.values(xListDefinitions).map((definition) => {
-    const runtimeIds = new Set((runtimeSources[definition.id] ?? []).map((source) => source.id));
     const rows = statusRows
       .filter((entry) => sources[definition.id]?.some((source) => source.id === entry.source.id))
       .map((entry) => ({
         ...entry,
-        removable: runtimeIds.has(entry.source.id)
+        removable: true
       }));
 
     return {
@@ -365,12 +392,21 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       runtimeSources[listId] ??= [];
+      runtimeSources.removed ??= {};
+      runtimeSources.removed[listId] ??= [];
       sources[listId] ??= [];
       const exists = sources[listId].some((item) => item.id === source.id);
       if (!exists) {
-        runtimeSources[listId].push(source);
-        sources[listId].push(source);
-        ingestor.addSource(source);
+        const configuredSource = configuredSourceForList(listId, source.id);
+        if (configuredSource) {
+          runtimeSources.removed[listId] = runtimeSources.removed[listId].filter((id) => id !== source.id);
+          sources[listId].push(configuredSource);
+          ingestor.addSource(configuredSource);
+        } else {
+          runtimeSources[listId].push(source);
+          sources[listId].push(source);
+          ingestor.addSource(source);
+        }
         await saveRuntimeSources(runtimeSources);
       }
       sendJson(res, { account: source });
@@ -390,13 +426,13 @@ const server = http.createServer(async (req, res) => {
       res.end("Unknown X list");
       return;
     }
-    const wasRuntime = (runtimeSources[listId] ?? []).some((item) => item.id === source.id);
-    if (!wasRuntime) {
-      res.writeHead(403);
-      res.end("Only runtime accounts can be removed here");
-      return;
+    runtimeSources.removed ??= {};
+    runtimeSources.removed[listId] ??= [];
+
+    const removedRuntime = removeRuntimeSource(listId, source.id);
+    if (!removedRuntime && configuredSourceForList(listId, source.id)) {
+      runtimeSources.removed[listId] = [...new Set([...runtimeSources.removed[listId], source.id])];
     }
-    runtimeSources[listId] = (runtimeSources[listId] ?? []).filter((item) => item.id !== source.id);
     sources[listId] = (sources[listId] ?? []).filter((item) => item.id !== source.id);
     ingestor.removeSource(source.id);
     await saveRuntimeSources(runtimeSources);
