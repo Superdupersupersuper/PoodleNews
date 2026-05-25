@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>PoodleNews Settings</title>
+    <link rel="stylesheet" href="/styles">
+  </head>
+  <body class="admin-page">
+    <header class="deckbar admin-bar">
+      <div class="brand">
+        <div class="mark">NA</div>
+        <div>
+          <h1>PoodleNews Settings</h1>
+          <p>Backend controls</p>
+        </div>
+      </div>
+      <div class="deck-controls"></div>
+      <div class="stats">
+        <span id="adminStatus">Loading</span>
+        <a class="nav-button" href="/">Live deck</a>
+      </div>
+    </header>
+
+    <main class="admin-shell">
+      <section class="admin-intro">
+        <p class="eyebrow">Settings</p>
+        <h2>X Sources</h2>
+      </section>
+      <section id="xListAdmin" class="admin-grid"></section>
+    </main>
+
+    <script type="module" src="/admin.js"></script>
+  </body>
+</html>

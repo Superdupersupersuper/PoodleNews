@@ -22,9 +22,13 @@ await mkdir(path.dirname(runtimeSourcesPath), { recursive: true });
 
 async function loadRuntimeSources() {
   try {
-    return JSON.parse(await readFile(runtimeSourcesPath, "utf8"));
+    const value = JSON.parse(await readFile(runtimeSourcesPath, "utf8"));
+    return {
+      whiteHouseX: value.whiteHouseX ?? [],
+      headlineX: value.headlineX ?? []
+    };
   } catch {
-    return { whiteHouseX: [] };
+    return { whiteHouseX: [], headlineX: [] };
   }
 }
 
@@ -33,7 +37,32 @@ async function saveRuntimeSources(value) {
 }
 
 const runtimeSources = await loadRuntimeSources();
-sources.whiteHouseX = [...(sources.whiteHouseX ?? []), ...(runtimeSources.whiteHouseX ?? [])];
+
+const xListDefinitions = {
+  whiteHouseX: {
+    id: "whiteHouseX",
+    label: "White House X",
+    description: "White House-adjacent and press pool accounts.",
+    idPrefix: "x",
+    pollMs: 10000,
+    priority: 78,
+    tags: ["white-house", "x"]
+  },
+  headlineX: {
+    id: "headlineX",
+    label: "Headlines / News X",
+    description: "Fast headline and market-moving news accounts.",
+    idPrefix: "x-headline",
+    pollMs: 10000,
+    priority: 72,
+    tags: ["headline-x", "x"]
+  }
+};
+
+for (const listId of Object.keys(xListDefinitions)) {
+  runtimeSources[listId] ??= [];
+  sources[listId] = [...(sources[listId] ?? []), ...runtimeSources[listId]];
+}
 
 const eventClients = new Set();
 const truthWebhookHealth = {
@@ -94,17 +123,44 @@ function normalizeHandle(value = "") {
   return value.trim().replace(/^https?:\/\/(www\.)?x\.com\//i, "").replace(/^@/, "").split(/[/?#]/)[0];
 }
 
-function whiteHouseSource(handle) {
+function xSourceForList(listId, handle, { runtime = true } = {}) {
+  const definition = xListDefinitions[listId];
+  if (!definition) return null;
   const username = normalizeHandle(handle);
+  const slug = username.toLowerCase().replace(/[^a-z0-9_]/g, "");
   return {
-    id: `x-${username.toLowerCase().replace(/[^a-z0-9_]/g, "")}`,
+    id: `${definition.idPrefix}-${slug}`,
     type: "x-user",
     label: username,
     username,
-    pollMs: 10000,
-    priority: 78,
-    tags: ["white-house", "x", "runtime"]
+    pollMs: definition.pollMs,
+    priority: definition.priority,
+    tags: runtime ? [...definition.tags, "runtime"] : definition.tags
   };
+}
+
+function whiteHouseSource(handle) {
+  return xSourceForList("whiteHouseX", handle);
+}
+
+function xListPayload() {
+  const statusRows = ingestor.getStatus();
+  return Object.values(xListDefinitions).map((definition) => {
+    const runtimeIds = new Set((runtimeSources[definition.id] ?? []).map((source) => source.id));
+    const rows = statusRows
+      .filter((entry) => sources[definition.id]?.some((source) => source.id === entry.source.id))
+      .map((entry) => ({
+        ...entry,
+        removable: runtimeIds.has(entry.source.id)
+      }));
+
+    return {
+      id: definition.id,
+      label: definition.label,
+      description: definition.description,
+      accounts: rows
+    };
+  });
 }
 
 const truthWebhookSource = {
@@ -204,7 +260,9 @@ async function serveStatic(req, res) {
   const requested = new URL(req.url, `http://${req.headers.host}`);
   const routeMap = {
     "/": "/index.html",
+    "/admin": "/admin.html",
     "/app": "/app.js",
+    "/admin.js": "/admin.js",
     "/styles": "/styles.css"
   };
   const pathname = routeMap[requested.pathname] ?? requested.pathname;
@@ -282,6 +340,67 @@ const server = http.createServer(async (req, res) => {
         .map((entry) => entry.source)
         .filter((source) => source.tags?.includes("white-house"))
     });
+    return;
+  }
+
+  if (url.pathname === "/api/x-lists" && req.method === "GET") {
+    sendJson(res, { lists: xListPayload() });
+    return;
+  }
+
+  const xListMatch = url.pathname.match(/^\/api\/x-lists\/([^/]+)(?:\/([^/]+))?$/);
+  if (xListMatch && req.method === "POST") {
+    try {
+      const listId = decodeURIComponent(xListMatch[1]);
+      const body = await readJsonBody(req);
+      const source = xSourceForList(listId, body.handle ?? "");
+      if (!source) {
+        res.writeHead(404);
+        res.end("Unknown X list");
+        return;
+      }
+      if (!source.username) {
+        res.writeHead(400);
+        res.end("Missing handle");
+        return;
+      }
+      runtimeSources[listId] ??= [];
+      sources[listId] ??= [];
+      const exists = sources[listId].some((item) => item.id === source.id);
+      if (!exists) {
+        runtimeSources[listId].push(source);
+        sources[listId].push(source);
+        ingestor.addSource(source);
+        await saveRuntimeSources(runtimeSources);
+      }
+      sendJson(res, { account: source });
+    } catch (error) {
+      res.writeHead(400);
+      res.end(error.message);
+    }
+    return;
+  }
+
+  if (xListMatch && req.method === "DELETE") {
+    const listId = decodeURIComponent(xListMatch[1]);
+    const handle = decodeURIComponent(xListMatch[2] ?? "");
+    const source = xSourceForList(listId, handle);
+    if (!source) {
+      res.writeHead(404);
+      res.end("Unknown X list");
+      return;
+    }
+    const wasRuntime = (runtimeSources[listId] ?? []).some((item) => item.id === source.id);
+    if (!wasRuntime) {
+      res.writeHead(403);
+      res.end("Only runtime accounts can be removed here");
+      return;
+    }
+    runtimeSources[listId] = (runtimeSources[listId] ?? []).filter((item) => item.id !== source.id);
+    sources[listId] = (sources[listId] ?? []).filter((item) => item.id !== source.id);
+    ingestor.removeSource(source.id);
+    await saveRuntimeSources(runtimeSources);
+    sendJson(res, { ok: true });
     return;
   }
 

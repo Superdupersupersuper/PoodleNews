@@ -131,8 +131,29 @@ input {
 
 .stats {
   display: flex;
+  align-items: center;
   gap: 14px;
   white-space: nowrap;
+}
+
+.nav-button {
+  min-height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #0f1110;
+  color: var(--accent);
+  padding: 0 10px;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.nav-button:hover {
+  border-color: var(--accent);
+  color: #ffffff;
 }
 
 .deck {
@@ -618,6 +639,94 @@ button.health-card:hover {
   text-overflow: ellipsis;
 }
 
+body.admin-page {
+  min-height: 100vh;
+  overflow: auto;
+}
+
+.admin-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.admin-shell {
+  min-height: calc(100vh - 52px);
+  padding: 18px;
+  background: #070807;
+}
+
+.admin-intro {
+  max-width: 1080px;
+  margin: 0 auto 14px;
+  display: grid;
+  gap: 3px;
+}
+
+.admin-intro h2 {
+  font-size: 22px;
+}
+
+.admin-grid {
+  max-width: 1080px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.admin-panel {
+  min-width: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.admin-panel-head {
+  min-height: 76px;
+  padding: 13px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(#222522, #171a17);
+}
+
+.admin-panel-head h3 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.15;
+}
+
+.admin-panel-head p:not(.eyebrow) {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.admin-account-form {
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-account-list {
+  max-height: none;
+  min-height: 260px;
+}
+
+.admin-account {
+  background: var(--panel-2);
+  padding: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-account-detail {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
 @keyframes heartbeat {
   0% {
     transform: scale(0.92);
@@ -663,6 +772,10 @@ button.health-card:hover {
 
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-grid {
+    grid-template-columns: 1fr;
   }
 
   .heartbeat-bar {

@@ -2,10 +2,7 @@ const socialFeed = document.querySelector("#socialFeed");
 const headlineFeed = document.querySelector("#headlineFeed");
 const whiteHouseFeed = document.querySelector("#whiteHouseFeed");
 const socialHealth = document.querySelector("#socialHealth");
-const whiteHouseAccounts = document.querySelector("#whiteHouseAccounts");
 const keywordsEl = document.querySelector("#keywords");
-const accountForm = document.querySelector("#accountForm");
-const accountInput = document.querySelector("#accountInput");
 const itemTemplate = document.querySelector("#itemTemplate");
 const search = document.querySelector("#search");
 const itemCount = document.querySelector("#itemCount");
@@ -232,31 +229,6 @@ async function openTruthHealth() {
   truthHealthTimer = setInterval(refreshTruthHealthDashboard, 1000);
 }
 
-function renderWhiteHouseAccounts(rows) {
-  whiteHouseAccounts.replaceChildren();
-  const whiteHouseRows = rows.filter((entry) => isWhiteHouseSource(entry.source));
-  for (const row of whiteHouseRows) {
-    const card = document.createElement("div");
-    card.className = "account-card";
-    const dotClass = row.ok === true ? "ok" : row.ok === false ? "bad" : "";
-    const removable = row.source.tags?.includes("runtime");
-    card.innerHTML = `
-      <div>
-        <div class="source-head">
-          <strong>@${row.source.username}</strong>
-          <span class="dot ${dotClass}"></span>
-        </div>
-        <div class="item-meta">
-          <span>${row.latencyMs ?? "-"}ms</span>
-          <span>${row.lastPollAt ? timeAgo(row.lastPollAt) : "pending"}</span>
-        </div>
-      </div>
-      ${removable ? `<button class="remove-account" type="button" data-handle="${row.source.username}">Remove</button>` : ""}
-    `;
-    whiteHouseAccounts.append(card);
-  }
-}
-
 function keywordMatch(item) {
   if (headlineKeywords.length === 0) return false;
   const haystack = `${item.title} ${item.summary || ""}`.toLowerCase();
@@ -393,14 +365,18 @@ function toggleSocialPost(event) {
 
 function renderItems() {
   const query = search.value.trim().toLowerCase();
+  const headlineXSourceIds = new Set(
+    sources
+      .filter((entry) => entry.source.tags?.includes("headline-x"))
+      .map((entry) => entry.source.id)
+  );
 
   const socialItems = items
     .filter((item) => socialSourceIds.has(item.sourceId))
     .filter((item) => itemMatchesSearch(item, query));
 
   const headlineItems = items
-    .filter((item) => item.type === "headline")
-    .filter(keywordMatch)
+    .filter((item) => (item.type === "headline" && keywordMatch(item)) || headlineXSourceIds.has(item.sourceId))
     .filter((item) => itemMatchesSearch(item, query));
 
   const whiteHouseItems = items
@@ -433,7 +409,6 @@ async function refresh() {
     sources = (await sourcesResponse.json()).sources;
     headlineKeywords = (await watchlistResponse.json()).headlineKeywords ?? [];
     renderHealth(sources);
-    renderWhiteHouseAccounts(sources);
     renderKeywords();
     renderItems();
     lastUpdate.textContent = `Updated ${timeAgo(new Date().toISOString())}`;
@@ -450,25 +425,6 @@ search.addEventListener("input", renderItems);
 socialFeed.addEventListener("click", toggleSocialPost);
 whiteHouseFeed.addEventListener("click", toggleSocialPost);
 headlineFeed.addEventListener("click", toggleSocialPost);
-accountForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const handle = accountInput.value.trim();
-  if (!handle) return;
-  accountInput.value = "";
-  await fetch("/api/white-house-x", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ handle })
-  });
-  await refresh();
-});
-
-whiteHouseAccounts.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-handle]");
-  if (!button) return;
-  await fetch(`/api/white-house-x/${encodeURIComponent(button.dataset.handle)}`, { method: "DELETE" });
-  await refresh();
-});
 
 socialHealth.addEventListener("click", (event) => {
   const card = event.target.closest("[data-health-source='trump-truth-direct']");
