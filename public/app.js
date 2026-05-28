@@ -400,12 +400,17 @@ async function refresh() {
   }
   refreshInFlight = true;
   try {
-    const [itemsResponse, sourcesResponse, watchlistResponse] = await Promise.all([
-      fetch("/api/items?limit=250"),
+    const [headlineItemsResponse, socialItemsResponse, sourcesResponse, watchlistResponse] = await Promise.all([
+      fetch("/api/items?type=headline&limit=250"),
+      fetch("/api/items?type=social-post&limit=250"),
       fetch("/api/sources"),
       fetch("/api/watchlist")
     ]);
-    items = (await itemsResponse.json()).items;
+    const headlineItemsPayload = await headlineItemsResponse.json();
+    const socialItemsPayload = await socialItemsResponse.json();
+    items = [...new Map(
+      [...headlineItemsPayload.items, ...socialItemsPayload.items].map((item) => [item.id, item])
+    ).values()];
     sources = (await sourcesResponse.json()).sources;
     headlineKeywords = (await watchlistResponse.json()).headlineKeywords ?? [];
     renderHealth(sources);

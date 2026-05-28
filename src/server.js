@@ -376,6 +376,8 @@ const server = http.createServer(async (req, res) => {
       items: store.list({
         q: url.searchParams.get("q"),
         source: url.searchParams.get("source"),
+        type: url.searchParams.get("type"),
+        tag: url.searchParams.get("tag"),
         limit: url.searchParams.get("limit") ?? 150
       })
     });

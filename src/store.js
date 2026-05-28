@@ -59,10 +59,12 @@ export class NewsStore {
     return fresh;
   }
 
-  list({ source, q, limit = 150 } = {}) {
+  list({ source, type, tag, q, limit = 150 } = {}) {
     const query = q?.trim().toLowerCase();
     return this.items
       .filter((item) => !source || item.sourceId === source)
+      .filter((item) => !type || item.type === type)
+      .filter((item) => !tag || item.tags?.includes(tag))
       .filter((item) => {
         if (!query) return true;
         return `${item.title} ${item.summary || ""} ${item.sourceLabel}`.toLowerCase().includes(query);
