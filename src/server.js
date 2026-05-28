@@ -1,4 +1,5 @@
 import http from "node:http";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +13,8 @@ const publicDir = path.join(root, "public");
 const port = Number(process.env.PORT ?? 4173);
 const host = process.env.HOST ?? "127.0.0.1";
 const appStartedAt = new Date();
+const adminPassword = process.env.ADMIN_PASSWORD ?? "poodlenews";
+const adminSessions = new Set();
 
 const configuredSources = JSON.parse(await readFile(path.join(root, "config", "sources.json"), "utf8"));
 const sources = JSON.parse(JSON.stringify(configuredSources));
@@ -128,6 +131,60 @@ const contentTypes = {
 function sendJson(res, value) {
   res.writeHead(200, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(value));
+}
+
+function parseCookies(req) {
+  return Object.fromEntries((req.headers.cookie ?? "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const index = part.indexOf("=");
+      if (index === -1) return [part, ""];
+      return [part.slice(0, index), decodeURIComponent(part.slice(index + 1))];
+    }));
+}
+
+function passwordMatches(value) {
+  const left = createHash("sha256").update(String(value ?? "")).digest();
+  const right = createHash("sha256").update(adminPassword).digest();
+  return left.equals(right);
+}
+
+function cookieOptions(req, { maxAge, clear = false } = {}) {
+  const secure = req.headers["x-forwarded-proto"] === "https";
+  return [
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    secure ? "Secure" : "",
+    maxAge != null ? `Max-Age=${maxAge}` : "",
+    clear ? "Expires=Thu, 01 Jan 1970 00:00:00 GMT" : ""
+  ].filter(Boolean).join("; ");
+}
+
+function setAdminSession(req, res) {
+  const token = randomUUID();
+  adminSessions.add(token);
+  res.setHeader("set-cookie", `poodlenews_admin=${encodeURIComponent(token)}; ${cookieOptions(req, { maxAge: 60 * 60 * 12 })}`);
+}
+
+function clearAdminSession(req, res) {
+  const token = parseCookies(req).poodlenews_admin;
+  if (token) adminSessions.delete(token);
+  res.setHeader("set-cookie", `poodlenews_admin=; ${cookieOptions(req, { maxAge: 0, clear: true })}`);
+}
+
+function hasAdminSession(req) {
+  const token = parseCookies(req).poodlenews_admin;
+  return Boolean(token && adminSessions.has(token));
+}
+
+function requireAdmin(req, res) {
+  if (hasAdminSession(req)) return true;
+  res.writeHead(401, { "content-type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify({ error: "Settings password required" }));
+  return false;
 }
 
 async function readJsonBody(req) {
@@ -335,6 +392,34 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === "/api/admin-session" && req.method === "GET") {
+    sendJson(res, { authenticated: hasAdminSession(req) });
+    return;
+  }
+
+  if (url.pathname === "/api/admin-login" && req.method === "POST") {
+    try {
+      const body = await readJsonBody(req);
+      if (!passwordMatches(body.password)) {
+        res.writeHead(401, { "content-type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ error: "Incorrect password" }));
+        return;
+      }
+      setAdminSession(req, res);
+      sendJson(res, { ok: true });
+    } catch (error) {
+      res.writeHead(400);
+      res.end(error.message);
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/admin-logout" && req.method === "POST") {
+    clearAdminSession(req, res);
+    sendJson(res, { ok: true });
+    return;
+  }
+
   if (url.pathname === "/api/webhooks/truth-social" && req.method === "POST") {
     try {
       await receiveTruthWebhook(req, res);
@@ -362,6 +447,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === "/api/white-house-x" && req.method === "GET") {
+    if (!requireAdmin(req, res)) return;
     sendJson(res, {
       accounts: ingestor.getStatus()
         .map((entry) => entry.source)
@@ -371,12 +457,14 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === "/api/x-lists" && req.method === "GET") {
+    if (!requireAdmin(req, res)) return;
     sendJson(res, { lists: xListPayload() });
     return;
   }
 
   const xListMatch = url.pathname.match(/^\/api\/x-lists\/([^/]+)(?:\/([^/]+))?$/);
   if (xListMatch && req.method === "POST") {
+    if (!requireAdmin(req, res)) return;
     try {
       const listId = decodeURIComponent(xListMatch[1]);
       const body = await readJsonBody(req);
@@ -418,6 +506,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (xListMatch && req.method === "DELETE") {
+    if (!requireAdmin(req, res)) return;
     const listId = decodeURIComponent(xListMatch[1]);
     const handle = decodeURIComponent(xListMatch[2] ?? "");
     const source = xSourceForList(listId, handle);
@@ -441,6 +530,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname === "/api/white-house-x" && req.method === "POST") {
+    if (!requireAdmin(req, res)) return;
     try {
       const body = await readJsonBody(req);
       const source = whiteHouseSource(body.handle ?? "");
@@ -466,6 +556,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url.pathname.startsWith("/api/white-house-x/") && req.method === "DELETE") {
+    if (!requireAdmin(req, res)) return;
     const handle = decodeURIComponent(url.pathname.split("/").pop() ?? "");
     const source = whiteHouseSource(handle);
     runtimeSources.whiteHouseX = (runtimeSources.whiteHouseX ?? []).filter((item) => item.id !== source.id);

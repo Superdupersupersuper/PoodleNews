@@ -18,6 +18,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   min-height: 100%;
@@ -154,6 +158,11 @@ input {
 .nav-button:hover {
   border-color: var(--accent);
   color: #ffffff;
+}
+
+.button-link {
+  width: auto;
+  text-transform: uppercase;
 }
 
 .deck {
@@ -654,6 +663,39 @@ body.admin-page {
   min-height: calc(100vh - 52px);
   padding: 18px;
   background: #070807;
+}
+
+.login-shell {
+  display: grid;
+  place-items: center;
+}
+
+.login-panel {
+  width: min(360px, 100%);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 18px;
+  display: grid;
+  gap: 11px;
+}
+
+.login-panel h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.login-panel button {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.login-message {
+  min-height: 16px;
+  color: var(--danger);
+  font-size: 12px;
 }
 
 .admin-intro {

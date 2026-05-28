@@ -18,11 +18,22 @@
       <div class="deck-controls"></div>
       <div class="stats">
         <span id="adminStatus">Loading</span>
+        <button id="logoutButton" class="nav-button button-link" type="button" hidden>Log out</button>
         <a class="nav-button" href="/">Live deck</a>
       </div>
     </header>
 
-    <main class="admin-shell">
+    <main id="loginShell" class="admin-shell login-shell" hidden>
+      <form id="loginForm" class="login-panel">
+        <p class="eyebrow">Settings locked</p>
+        <h2>Enter Password</h2>
+        <input id="passwordInput" name="password" type="password" autocomplete="current-password" autofocus>
+        <button type="submit">Unlock</button>
+        <p id="loginMessage" class="login-message" aria-live="polite"></p>
+      </form>
+    </main>
+
+    <main id="adminShell" class="admin-shell" hidden>
       <section class="admin-intro">
         <p class="eyebrow">Settings</p>
         <h2>X Sources</h2>

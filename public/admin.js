@@ -1,5 +1,12 @@
 const adminStatus = document.querySelector("#adminStatus");
+const adminShell = document.querySelector("#adminShell");
+const loginShell = document.querySelector("#loginShell");
+const loginForm = document.querySelector("#loginForm");
+const passwordInput = document.querySelector("#passwordInput");
+const loginMessage = document.querySelector("#loginMessage");
+const logoutButton = document.querySelector("#logoutButton");
 const xListAdmin = document.querySelector("#xListAdmin");
+let authenticated = false;
 
 function timeAgo(value) {
   const then = new Date(value).getTime();
@@ -111,12 +118,79 @@ function listPanel(list) {
   return panel;
 }
 
+function showLocked(message = "") {
+  authenticated = false;
+  adminShell.hidden = true;
+  loginShell.hidden = false;
+  logoutButton.hidden = true;
+  adminStatus.textContent = "Locked";
+  loginMessage.textContent = message;
+  passwordInput.focus();
+}
+
+function showUnlocked() {
+  authenticated = true;
+  loginShell.hidden = true;
+  adminShell.hidden = false;
+  logoutButton.hidden = false;
+}
+
+async function adminFetch(url, options = {}) {
+  const response = await fetch(url, options);
+  if (response.status === 401) {
+    showLocked("Password required.");
+    throw new Error("Settings password required");
+  }
+  return response;
+}
+
 async function refreshLists() {
-  const response = await fetch("/api/x-lists");
+  if (!authenticated) return;
+  const response = await adminFetch("/api/x-lists");
   const payload = await response.json();
   xListAdmin.replaceChildren(...payload.lists.map(listPanel));
   adminStatus.textContent = `Updated ${timeAgo(new Date().toISOString())}`;
 }
+
+async function checkSession() {
+  const response = await fetch("/api/admin-session");
+  const payload = await response.json();
+  if (!payload.authenticated) {
+    showLocked();
+    return;
+  }
+  showUnlocked();
+  await refreshLists();
+}
+
+loginForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const password = passwordInput.value;
+  loginMessage.textContent = "";
+  adminStatus.textContent = "Checking";
+
+  const response = await fetch("/api/admin-login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password })
+  });
+
+  if (!response.ok) {
+    showLocked("Incorrect password.");
+    passwordInput.select();
+    return;
+  }
+
+  passwordInput.value = "";
+  showUnlocked();
+  await refreshLists();
+});
+
+logoutButton.addEventListener("click", async () => {
+  await fetch("/api/admin-logout", { method: "POST" });
+  xListAdmin.replaceChildren();
+  showLocked();
+});
 
 xListAdmin.addEventListener("submit", async (event) => {
   const form = event.target.closest("[data-list-id]");
@@ -128,7 +202,7 @@ xListAdmin.addEventListener("submit", async (event) => {
   if (!handle) return;
 
   input.value = "";
-  await fetch(`/api/x-lists/${encodeURIComponent(form.dataset.listId)}`, {
+  await adminFetch(`/api/x-lists/${encodeURIComponent(form.dataset.listId)}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ handle })
@@ -141,13 +215,13 @@ xListAdmin.addEventListener("click", async (event) => {
   if (!remove) return;
 
   const panel = remove.closest("[data-list-id]");
-  await fetch(`/api/x-lists/${encodeURIComponent(panel.dataset.listId)}/${encodeURIComponent(remove.dataset.handle)}`, {
+  await adminFetch(`/api/x-lists/${encodeURIComponent(panel.dataset.listId)}/${encodeURIComponent(remove.dataset.handle)}`, {
     method: "DELETE"
   });
   await refreshLists();
 });
 
-refreshLists();
+checkSession();
 setInterval(() => {
   if (!xListAdmin.contains(document.activeElement)) refreshLists();
 }, 5000);
