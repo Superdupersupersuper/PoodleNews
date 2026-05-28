@@ -9,6 +9,7 @@ export class NewsStore {
   constructor() {
     this.items = [];
     this.seen = new Set();
+    this.seenHeadlineKeys = new Set();
   }
 
   async load() {
@@ -16,10 +17,15 @@ export class NewsStore {
     try {
       const raw = await readFile(STORE_PATH, "utf8");
       this.items = JSON.parse(raw);
+      const before = this.items.length;
+      this.items = dedupeItems(this.items);
       this.seen = new Set(this.items.map((item) => item.id));
+      this.seenHeadlineKeys = new Set(this.items.map((item) => headlineKey(item)).filter(Boolean));
+      if (this.items.length !== before) await this.persist();
     } catch {
       this.items = [];
       this.seen = new Set();
+      this.seenHeadlineKeys = new Set();
       await this.persist();
     }
   }
@@ -28,7 +34,10 @@ export class NewsStore {
     const fresh = [];
     for (const item of items) {
       if (!item?.id || this.seen.has(item.id)) continue;
+      const contentKey = headlineKey(item);
+      if (contentKey && this.seenHeadlineKeys.has(contentKey)) continue;
       this.seen.add(item.id);
+      if (contentKey) this.seenHeadlineKeys.add(contentKey);
       const normalized = {
         priority: 0,
         tags: [],
@@ -44,6 +53,7 @@ export class NewsStore {
         .sort((a, b) => new Date(b.publishedAt || b.createdAt) - new Date(a.publishedAt || a.createdAt))
         .slice(0, MAX_ITEMS);
       this.seen = new Set(this.items.map((item) => item.id));
+      this.seenHeadlineKeys = new Set(this.items.map((item) => headlineKey(item)).filter(Boolean));
     }
 
     return fresh;
@@ -63,4 +73,41 @@ export class NewsStore {
   async persist() {
     await writeFile(STORE_PATH, JSON.stringify(this.items, null, 2));
   }
+}
+
+function normalizedHeadlineUrl(value = "") {
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    url.search = "";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return value.split(/[?#]/)[0].replace(/\/$/, "");
+  }
+}
+
+function headlineKey(item) {
+  if (item?.type !== "headline") return "";
+  const url = normalizedHeadlineUrl(item.url);
+  if (url) return `url:${url}`;
+  const title = `${item.title ?? ""}`.toLowerCase().replace(/\s+/g, " ").trim();
+  return title ? `title:${title}` : "";
+}
+
+function dedupeItems(items) {
+  const ids = new Set();
+  const headlineKeys = new Set();
+  const kept = [];
+
+  for (const item of items) {
+    if (!item?.id || ids.has(item.id)) continue;
+    const contentKey = headlineKey(item);
+    if (contentKey && headlineKeys.has(contentKey)) continue;
+    ids.add(item.id);
+    if (contentKey) headlineKeys.add(contentKey);
+    kept.push(item);
+  }
+
+  return kept;
 }

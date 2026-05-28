@@ -74,15 +74,170 @@
       "label": "Al Jazeera",
       "url": "https://www.aljazeera.com/xml/rss/all.xml",
       "pollMs": 30000,
-      "priority": 55
+      "priority": 65,
+      "tags": ["headline-wire", "al-jazeera"]
+    },
+    {
+      "id": "axios",
+      "type": "rss",
+      "label": "Axios",
+      "url": "https://api.axios.com/feed/",
+      "pollMs": 180000,
+      "priority": 66,
+      "tags": ["headline-wire", "axios"]
+    },
+    {
+      "id": "bbc-top",
+      "type": "rss",
+      "label": "BBC Top",
+      "url": "https://feeds.bbci.co.uk/news/rss.xml",
+      "pollMs": 10000,
+      "priority": 64,
+      "tags": ["headline-wire", "bbc"]
     },
     {
       "id": "bbc-world",
       "type": "rss",
       "label": "BBC World",
       "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
-      "pollMs": 30000,
-      "priority": 50
+      "pollMs": 15000,
+      "priority": 63,
+      "tags": ["headline-wire", "bbc"]
+    },
+    {
+      "id": "bbc-business",
+      "type": "rss",
+      "label": "BBC Business",
+      "url": "https://feeds.bbci.co.uk/news/business/rss.xml",
+      "pollMs": 15000,
+      "priority": 62,
+      "tags": ["headline-wire", "bbc"]
+    },
+    {
+      "id": "bbc-technology",
+      "type": "rss",
+      "label": "BBC Technology",
+      "url": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+      "pollMs": 15000,
+      "priority": 61,
+      "tags": ["headline-wire", "bbc"]
+    },
+    {
+      "id": "bloomberg-top",
+      "type": "rss",
+      "label": "Bloomberg",
+      "url": "https://feeds.bloomberg.com/news.rss",
+      "pollMs": 120000,
+      "priority": 70,
+      "tags": ["headline-wire", "bloomberg"]
+    },
+    {
+      "id": "bloomberg-markets",
+      "type": "rss",
+      "label": "Bloomberg Markets",
+      "url": "https://feeds.bloomberg.com/markets/news.rss",
+      "pollMs": 120000,
+      "priority": 70,
+      "tags": ["headline-wire", "bloomberg", "markets"]
+    },
+    {
+      "id": "bloomberg-economics",
+      "type": "rss",
+      "label": "Bloomberg Economics",
+      "url": "https://feeds.bloomberg.com/economics/news.rss",
+      "pollMs": 120000,
+      "priority": 69,
+      "tags": ["headline-wire", "bloomberg", "economics"]
+    },
+    {
+      "id": "bloomberg-politics",
+      "type": "rss",
+      "label": "Bloomberg Politics",
+      "url": "https://feeds.bloomberg.com/politics/news.rss",
+      "pollMs": 120000,
+      "priority": 68,
+      "tags": ["headline-wire", "bloomberg", "politics"]
+    },
+    {
+      "id": "bloomberg-technology",
+      "type": "rss",
+      "label": "Bloomberg Technology",
+      "url": "https://feeds.bloomberg.com/technology/news.rss",
+      "pollMs": 120000,
+      "priority": 68,
+      "tags": ["headline-wire", "bloomberg", "technology"]
+    },
+    {
+      "id": "forbes-business",
+      "type": "rss",
+      "label": "Forbes Business",
+      "url": "https://feeds.forbes.com/business/feed",
+      "pollMs": 90000,
+      "priority": 58,
+      "tags": ["headline-wire", "forbes"]
+    },
+    {
+      "id": "forbes-innovation",
+      "type": "rss",
+      "label": "Forbes Innovation",
+      "url": "https://feeds.forbes.com/innovation/feed",
+      "pollMs": 90000,
+      "priority": 57,
+      "tags": ["headline-wire", "forbes", "technology"]
+    },
+    {
+      "id": "forbes-money",
+      "type": "rss",
+      "label": "Forbes Money",
+      "url": "https://feeds.forbes.com/money/feed",
+      "pollMs": 90000,
+      "priority": 57,
+      "tags": ["headline-wire", "forbes", "money"]
+    },
+    {
+      "id": "fox-latest",
+      "type": "rss",
+      "label": "Fox News",
+      "url": "https://moxie.foxnews.com/google-publisher/latest.xml",
+      "pollMs": 15000,
+      "priority": 67,
+      "tags": ["headline-wire", "fox-news"]
+    },
+    {
+      "id": "fox-politics",
+      "type": "rss",
+      "label": "Fox Politics",
+      "url": "https://moxie.foxnews.com/google-publisher/politics.xml",
+      "pollMs": 15000,
+      "priority": 66,
+      "tags": ["headline-wire", "fox-news", "politics"]
+    },
+    {
+      "id": "fox-world",
+      "type": "rss",
+      "label": "Fox World",
+      "url": "https://moxie.foxnews.com/google-publisher/world.xml",
+      "pollMs": 15000,
+      "priority": 65,
+      "tags": ["headline-wire", "fox-news"]
+    },
+    {
+      "id": "fox-us",
+      "type": "rss",
+      "label": "Fox U.S.",
+      "url": "https://moxie.foxnews.com/google-publisher/us.xml",
+      "pollMs": 15000,
+      "priority": 65,
+      "tags": ["headline-wire", "fox-news"]
+    },
+    {
+      "id": "wsj-google-news",
+      "type": "rss",
+      "label": "WSJ via Google News",
+      "url": "https://news.google.com/rss/search?q=site%3Awsj.com%20when%3A1d&hl=en-US&gl=US&ceid=US%3Aen",
+      "pollMs": 120000,
+      "priority": 60,
+      "tags": ["headline-wire", "wsj", "google-news-fallback"]
     },
     {
       "id": "guardian-world",
@@ -90,7 +245,8 @@
       "label": "Guardian World",
       "url": "https://www.theguardian.com/world/rss",
       "pollMs": 45000,
-      "priority": 48
+      "priority": 48,
+      "tags": ["headline-wire", "guardian"]
     }
   ]
 }

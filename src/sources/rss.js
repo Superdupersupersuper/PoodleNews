@@ -35,19 +35,42 @@ function itemBlocks(xml) {
   return matches ?? [];
 }
 
-export async function fetchRss(source) {
+function parseDate(value) {
+  if (!value) return new Date().toISOString();
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? new Date(time).toISOString() : new Date().toISOString();
+}
+
+function cacheEntry(cache, sourceId) {
+  cache.rss ??= {};
+  cache.rss[sourceId] ??= {};
+  return cache.rss[sourceId];
+}
+
+export async function fetchRss(source, cache = {}) {
+  const state = cacheEntry(cache, source.id);
+  const headers = {
+    "accept": "application/rss+xml, application/atom+xml, text/xml;q=0.9, */*;q=0.8",
+    "user-agent": "NewsAggregator/0.1 (+local dashboard)"
+  };
+  if (state.etag) headers["if-none-match"] = state.etag;
+  if (state.lastModified) headers["if-modified-since"] = state.lastModified;
+
   const response = await fetch(source.url, {
-    headers: {
-      "accept": "application/rss+xml, application/atom+xml, text/xml;q=0.9, */*;q=0.8",
-      "user-agent": "NewsAggregator/0.1 (+local dashboard)"
-    }
+    headers
   });
+
+  if (response.status === 304) return [];
 
   if (!response.ok) {
     throw new Error(`RSS ${source.label} returned ${response.status}`);
   }
 
+  state.etag = response.headers.get("etag") ?? state.etag;
+  state.lastModified = response.headers.get("last-modified") ?? state.lastModified;
+
   const xml = await response.text();
+  const sourceTags = Array.isArray(source.tags) ? source.tags : [];
   return itemBlocks(xml).map((block) => {
     const title = tagValue(block, "title");
     const link = tagValue(block, "link") || block.match(/<link[^>]+href="([^"]+)"/i)?.[1] || "";
@@ -62,9 +85,9 @@ export async function fetchRss(source) {
       title,
       summary: tagValue(block, "description") || tagValue(block, "summary"),
       url: link,
-      publishedAt: publishedAt ? new Date(publishedAt).toISOString() : new Date().toISOString(),
+      publishedAt: parseDate(publishedAt),
       priority: source.priority ?? 0,
-      tags: ["rss"]
+      tags: [...new Set(["rss", ...sourceTags])]
     };
   }).filter((item) => item.title);
 }

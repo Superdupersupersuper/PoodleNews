@@ -376,7 +376,7 @@ function renderItems() {
     .filter((item) => itemMatchesSearch(item, query));
 
   const headlineItems = items
-    .filter((item) => (item.type === "headline" && keywordMatch(item)) || headlineXSourceIds.has(item.sourceId))
+    .filter((item) => item.type === "headline" || headlineXSourceIds.has(item.sourceId))
     .filter((item) => itemMatchesSearch(item, query));
 
   const whiteHouseItems = items
